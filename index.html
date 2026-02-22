@@ -793,7 +793,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.85);color:rgba(255,255,255,0.85)">Andrea Muraro</strong></div>
-          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 14:09</div>
+          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 14:32</div>
         </div>
       </div>
       <div class="header-actions">
@@ -1254,20 +1254,34 @@ function renderSavePathSection() {
         (hasToken ? '&#10003; Token presente &mdash; premi Salva Dati per verificare la connessione' : 'Nessun token inserito &mdash; clicca &quot;Come ottenere il Token&quot; per iniziare') +
         '</div></div>';
     }
-    // Dropbox e OneDrive: token manuale (per ora)
-    return '<div style="margin-top:4px;background:rgba(255,255,255,0.04);border-radius:12px;padding:14px;border:1px solid rgba(255,255,255,0.08)">' +
-      '<div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Token di accesso — ' + methodLabel(m) + '</div>' +
-      '<div style="display:flex;gap:8px">' +
-      '<input id="sett-token-input" type="password" placeholder="Incolla qui il tuo token..." value="' + (SETTINGS[m + '_token'] || '') + '" style="flex:1;padding:10px 12px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:13px">' +
-      '<button onclick="saveCloudToken()" style="padding:10px 14px;border-radius:10px;background:rgba(226,184,74,0.2);border:1.5px solid rgba(226,184,74,0.5);color:#e2b84a;font-weight:700;font-size:12px;cursor:pointer">Salva</button>' +
+    // Dropbox / OneDrive: token manuale con guida dedicata
+    const isDropbox   = m === 'dropbox';
+    const svcColor    = isDropbox ? '#0061ff' : '#0078d4';
+    const hasTokenSvc = !!(SETTINGS[m + '_token']);
+    const guideBtn    = isDropbox ? 'window._showDropboxGuide()' : 'window._showOneDriveGuide()';
+    const svcIcon     = isDropbox
+      ? '<svg viewBox="0 0 43.1 40.5" width="13" height="13"><path fill="#0061ff" d="M12.8 0L0 8.2l12.8 8.2 12.8-8.2zM38.3 0L25.5 8.2l12.8 8.2 12.8-8.2zM0 24.7l12.8 8.2 12.8-8.2-12.8-8.2zM38.3 16.5l-12.8 8.2 12.8 8.2 12.8-8.2zM12.8 28.1l12.8 8.2 12.8-8.2-12.8-8.2z"/></svg>'
+      : '<svg viewBox="0 0 32 32" width="13" height="13"><path d="M19.2 12.8A7.2 7.2 0 006.4 16H6a6 6 0 000 12h20a5 5 0 000-10 4.98 4.98 0 00-1.1.12A7.2 7.2 0 0019.2 12.8z" fill="#0078d4"/></svg>';
+    return '<div style="margin-top:4px;background:rgba(255,255,255,0.04);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,0.08)">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">' +
+      '<div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:1px">Token di accesso ' + methodLabel(m) + '</div>' +
+      '<button onclick="' + guideBtn + '" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:1.5px solid ' + svcColor + '80;background:' + svcColor + '1a;color:' + svcColor + ';font-size:11px;font-weight:700;cursor:pointer">' +
+      svcIcon + ' Come ottenere il Token</button>' +
       '</div>' +
-      '<div style="font-size:11px;color:rgba(255,255,255,0.3);margin-top:8px">' +
-      (m==='dropbox' ? '👉 Token da <a href="https://www.dropbox.com/developers/apps" target="_blank" style="color:#4caf82">Dropbox Developer</a>' :
-       '👉 Token da <a href="https://portal.azure.com" target="_blank" style="color:#4caf82">Azure Portal</a> · scope: Files.ReadWrite') +
+      '<div style="display:flex;gap:8px;margin-bottom:8px">' +
+      '<input id="sett-token-input" type="password" placeholder="Incolla qui il token..." value="' + (SETTINGS[m + '_token'] || '') + '" style="flex:1;padding:10px 12px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:13px">' +
+      '<button onclick="saveCloudToken()" style="padding:10px 16px;border-radius:10px;background:rgba(226,184,74,0.2);border:1.5px solid rgba(226,184,74,0.5);color:#e2b84a;font-weight:700;font-size:12px;cursor:pointer">Salva</button>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:' + (hasTokenSvc ? '#4caf82' : 'rgba(255,255,255,0.3)') + '">' +
+      '<span style="width:6px;height:6px;border-radius:50%;background:' + (hasTokenSvc ? '#4caf82' : 'rgba(255,255,255,0.2)') + '"></span>' +
+      (hasTokenSvc ? '&#10003; Token presente' : 'Nessun token — clicca &quot;Come ottenere il Token&quot; per iniziare') +
       '</div></div>';
   })() : (m === 'local' ? (
     '<div style="margin-top:4px;background:rgba(255,255,255,0.04);border-radius:12px;padding:14px;border:1px solid rgba(255,255,255,0.08)">' +
-    '<div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Cartella di destinazione</div>' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">' +
+    '<div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:1px">Cartella di destinazione</div>' +
+    '<button onclick="window._showLocalGuide()" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:1.5px solid rgba(226,184,74,0.5);background:rgba(226,184,74,0.12);color:#e2b84a;font-size:11px;font-weight:700;cursor:pointer"><svg viewBox=\"0 0 24 24\" width=\"12\" height=\"12\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 16v-4M12 8h.01\"/></svg> Come funziona?</button>' +
+    '</div>' +
     (_dirHandle
       ? ('<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
          '<span style="font-size:18px">📁</span>' +
@@ -1427,6 +1441,157 @@ window._showGDriveGuide = function() {
   document.body.appendChild(el);
   el.addEventListener('click', e => { if (e.target === el) el.remove(); });
 };
+
+
+// ── Guida Dropbox ────────────────────────────────────────────────────────
+window._showDropboxGuide = function() {
+  if (document.getElementById('dropbox-guide-overlay')) return;
+  _showTokenGuide({
+    id: 'dropbox-guide-overlay',
+    title: 'Come ottenere il Token Dropbox',
+    subtitle: 'Dropbox · 5 passi semplici · circa 5 minuti',
+    color: '#0061ff',
+    icon: '<svg viewBox="0 0 43.1 40.5" width="28" height="28"><path fill="#0061ff" d="M12.8 0L0 8.2l12.8 8.2 12.8-8.2zM38.3 0L25.5 8.2l12.8 8.2 12.8-8.2zM0 24.7l12.8 8.2 12.8-8.2-12.8-8.2zM38.3 16.5l-12.8 8.2 12.8 8.2 12.8-8.2zM12.8 28.1l12.8 8.2 12.8-8.2-12.8-8.2z"/></svg>',
+    iconBg: 'rgba(0,97,255,0.15)',
+    iconBorder: 'rgba(0,97,255,0.4)',
+    steps: [
+      { n:'1', title:'Vai alla Dropbox Developer Console',
+        desc:'Clicca il pulsante qui sotto per aprire la console sviluppatori di Dropbox. Accedi con il tuo account Dropbox.',
+        action:'<a href="https://www.dropbox.com/developers/apps" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:12px;background:rgba(0,97,255,0.2);border:2px solid rgba(0,97,255,0.5);color:#0061ff;font-weight:700;font-size:13px;text-decoration:none">🔗 Apri Dropbox Developer</a>',
+        note:'' },
+      { n:'2', title:'Crea una nuova App',
+        desc:'Clicca il pulsante <strong style="color:#fff">Create app</strong>. Scegli <strong style="color:#fff">Scoped access</strong>, poi <strong style="color:#fff">App folder</strong> (accede solo a una cartella dedicata). Nel campo Name scrivi <strong style="color:#e2b84a">AnalisiFatturatoPRO</strong>. Clicca <strong style="color:#fff">Create app</strong>.',
+        action:'', note:'💡 Con "App folder" Dropbox crea automaticamente la cartella <strong style="color:#fff">Apps/AnalisiFatturatoPRO</strong> nel tuo Drive — i file vengono salvati lì.' },
+      { n:'3', title:'Imposta i permessi',
+        desc:'Nella pagina della tua app clicca la scheda <strong style="color:#fff">Permissions</strong>. Spunta <strong style="color:#e2b84a">files.content.write</strong> e <strong style="color:#e2b84a">files.content.read</strong>. Clicca <strong style="color:#fff">Submit</strong> in fondo.',
+        action:'', note:'' },
+      { n:'4', title:'Genera il token',
+        desc:'Torna alla scheda <strong style="color:#fff">Settings</strong>. Scorri fino a <strong style="color:#fff">OAuth 2</strong> → sezione <strong style="color:#fff">Generated access token</strong>. Clicca <strong style="color:#fff">Generate</strong>.',
+        action:'', note:'⏱️ Il token Dropbox non scade (a meno che non lo revochi tu). Una volta generato è permanente.' },
+      { n:'5', title:'Copia e incolla il token',
+        desc:'Copia il token generato e incollalo nel campo <strong style="color:#e2b84a">Token di accesso Dropbox</strong> nell&#39;app, poi clicca <strong style="color:#fff">Salva</strong>.',
+        action:'', note:'✅ Da questo momento i file vengono salvati in <strong style="color:#fff">Dropbox/Apps/AnalisiFatturatoPRO/</strong>' }
+    ],
+    footer: { icon:'💙', text:'<strong style="color:#0061ff">Vantaggio Dropbox:</strong> il token non scade mai — configuralo una volta sola e funzionerà per sempre.' }
+  });
+};
+
+// ── Guida OneDrive ───────────────────────────────────────────────────────
+window._showOneDriveGuide = function() {
+  if (document.getElementById('onedrive-guide-overlay')) return;
+  _showTokenGuide({
+    id: 'onedrive-guide-overlay',
+    title: 'Come ottenere il Token OneDrive',
+    subtitle: 'Microsoft OneDrive · 6 passi · circa 10 minuti',
+    color: '#0078d4',
+    icon: '<svg viewBox="0 0 32 32" width="28" height="28"><path d="M19.2 12.8A7.2 7.2 0 006.4 16H6a6 6 0 000 12h20a5 5 0 000-10 4.98 4.98 0 00-1.1.12A7.2 7.2 0 0019.2 12.8z" fill="#0078d4"/></svg>',
+    iconBg: 'rgba(0,120,212,0.15)',
+    iconBorder: 'rgba(0,120,212,0.4)',
+    steps: [
+      { n:'1', title:'Vai al portale Azure',
+        desc:'Clicca qui sotto per aprire il portale Azure di Microsoft. Accedi con il tuo account Microsoft (lo stesso di OneDrive).',
+        action:'<a href="https://portal.azure.com" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:12px;background:rgba(0,120,212,0.2);border:2px solid rgba(0,120,212,0.5);color:#0078d4;font-weight:700;font-size:13px;text-decoration:none">🔗 Apri Azure Portal</a>',
+        note:'' },
+      { n:'2', title:'Registra una nuova app',
+        desc:'Cerca <strong style="color:#fff">App registrations</strong> nella barra di ricerca. Clicca <strong style="color:#fff">+ New registration</strong>. Come nome inserisci <strong style="color:#e2b84a">AnalisiFatturatoPRO</strong>. Lascia tutto il resto invariato e clicca <strong style="color:#fff">Register</strong>.',
+        action:'', note:'' },
+      { n:'3', title:'Aggiungi i permessi OneDrive',
+        desc:'Nel menu a sinistra clicca <strong style="color:#fff">API permissions → + Add a permission → Microsoft Graph → Delegated permissions</strong>. Cerca e seleziona <strong style="color:#e2b84a">Files.ReadWrite</strong>. Clicca <strong style="color:#fff">Add permissions</strong>.',
+        action:'', note:'' },
+      { n:'4', title:'Crea un Client Secret',
+        desc:'Nel menu clicca <strong style="color:#fff">Certificates & secrets → + New client secret</strong>. Scegli una scadenza (es. 24 mesi) e clicca <strong style="color:#fff">Add</strong>. <strong style="color:#ff4757">Copia subito il valore</strong> — non sarà più visibile dopo.',
+        action:'', note:'⚠️ Copia il campo <strong style="color:#fff">Value</strong>, non l&#39;ID.' },
+      { n:'5', title:'Ottieni il token con Graph Explorer',
+        desc:'Vai su <a href="https://developer.microsoft.com/en-us/graph/graph-explorer" target="_blank" style="color:#0078d4">Graph Explorer</a>, accedi con il tuo account Microsoft e copia il token dalla sezione <strong style="color:#fff">Access token</strong> in alto a destra.',
+        action:'<a href="https://developer.microsoft.com/en-us/graph/graph-explorer" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:12px;background:rgba(0,120,212,0.2);border:2px solid rgba(0,120,212,0.5);color:#0078d4;font-weight:700;font-size:13px;text-decoration:none">🔗 Apri Graph Explorer</a>',
+        note:'' },
+      { n:'6', title:'Incolla il token nell&#39;app',
+        desc:'Copia il token da Graph Explorer e incollalo nel campo <strong style="color:#e2b84a">Token di accesso OneDrive</strong>, poi clicca <strong style="color:#fff">Salva</strong>.',
+        action:'', note:'✅ I file verranno salvati in <strong style="color:#fff">OneDrive/Apps/AnalisiFatturatoPRO/</strong>' }
+    ],
+    footer: { icon:'⏱️', text:'<strong style="color:#0078d4">Token in scadenza:</strong> il token Microsoft dura circa 1 ora. Per uso continuativo valuta di impostare un refresh token — contatta il supporto se necessario.' }
+  });
+};
+
+// ── Guida Download Locale ────────────────────────────────────────────────
+window._showLocalGuide = function() {
+  if (document.getElementById('local-guide-overlay')) return;
+  _showTokenGuide({
+    id: 'local-guide-overlay',
+    title: 'Come funziona il salvataggio locale',
+    subtitle: 'Download sul tuo computer · nessuna configurazione richiesta',
+    color: '#e2b84a',
+    icon: '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#e2b84a" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>',
+    iconBg: 'rgba(226,184,74,0.15)',
+    iconBorder: 'rgba(226,184,74,0.4)',
+    steps: [
+      { n:'📁', title:'Come viene salvato il file',
+        desc:'Quando premi <strong style="color:#fff">Salva Dati</strong>, l&#39;app crea un file chiamato <strong style="color:#e2b84a">DB_Analisi_Fatturato_PRO_001.json</strong> e lo scarica sul tuo computer. Ogni volta che crei un nuovo file il numero aumenta: _001, _002, _003...',
+        action:'', note:'💡 Il file .json contiene tutti i tuoi dati in formato leggibile. Puoi aprirlo con qualsiasi editor di testo per verificarne il contenuto.' },
+      { n:'📂', title:'Su Chrome: scegli la cartella (consigliato)',
+        desc:'Se usi <strong style="color:#fff">Google Chrome</strong>, puoi cliccare <strong style="color:#e2b84a">Scegli cartella di salvataggio</strong> qui in basso. Si aprirà una finestra per selezionare una cartella specifica (es. Documenti/FatturatoPRO). I file verranno salvati direttamente lì.',
+        action:'', note:'⚠️ La cartella scelta viene dimenticata ogni volta che chiudi il browser. Dovrai riselezionarla una volta per sessione.' },
+      { n:'📥', title:'Su Safari: cartella Download',
+        desc:'Su <strong style="color:#fff">Safari</strong> non è possibile scegliere la cartella di destinazione. I file vengono scaricati automaticamente nella cartella <strong style="color:#e2b84a">Download</strong> del tuo Mac.',
+        action:'', note:'💡 Consiglio: crea una cartella <strong style="color:#fff">FatturatoPRO</strong> in Documenti e sposta lì i file dopo il download.' },
+      { n:'🔄', title:'Come ricaricare i dati alla riapertura',
+        desc:'Quando riapri l&#39;app, i dati dell&#39; <strong style="color:#fff">ultima sessione</strong> vengono caricati automaticamente dalla memoria del browser. Se la memoria è stata svuotata, clicca <strong style="color:#e2b84a">Carica Dati</strong> in alto e seleziona il file .json salvato in precedenza.',
+        action:'', note:'' },
+      { n:'💾', title:'Sovrascrivi o crea un nuovo file',
+        desc:'Quando premi <strong style="color:#fff">Salva Dati</strong> puoi scegliere:<br>• <strong style="color:#e2b84a">Sovrascrivi</strong>: aggiorna il file esistente con i dati attuali<br>• <strong style="color:#4caf82">Nuovo file</strong>: crea un file con numero progressivo (es. _002.json) mantenendo il precedente come backup',
+        action:'', note:'💡 Usa "Nuovo file" prima di importare dati nuovi — così hai sempre una copia di sicurezza.' }
+    ],
+    footer: { icon:'🔒', text:'<strong style="color:#e2b84a">Sicurezza:</strong> i dati rimangono solo sul tuo computer. Nessun dato viene inviato a server esterni.' }
+  });
+};
+
+// ── Funzione generica per mostrare le guide ──────────────────────────────
+window._closeGuideById = function(btn) {
+  var id = btn.getAttribute('data-guide-id');
+  var o  = id ? document.getElementById(id) : null;
+  if (o) o.remove();
+};
+
+function _showTokenGuide(cfg) {
+  const el = document.createElement('div');
+  el.id = cfg.id;
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.88);backdrop-filter:blur(12px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
+
+  const stepsHTML = cfg.steps.map(s =>
+    '<div style="display:flex;gap:14px;padding:16px;background:rgba(255,255,255,0.04);border-radius:14px;border:1px solid rgba(255,255,255,0.08)">' +
+    '<div style="flex-shrink:0;width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,' + cfg.color + ',' + cfg.color + 'aa);display:flex;align-items:center;justify-content:center;font-size:' + (isNaN(s.n) ? '15px' : '13px') + ';font-weight:800;color:#fff">' + s.n + '</div>' +
+    '<div style="flex:1;min-width:0">' +
+    '<div style="font-size:14px;font-weight:800;color:#fff;margin-bottom:5px">' + s.title + '</div>' +
+    '<div style="font-size:12px;color:rgba(255,255,255,0.6);line-height:1.65;margin-bottom:' + ((s.action||s.note) ? '10px' : '0') + '">' + s.desc + '</div>' +
+    (s.action ? '<div style="margin-bottom:' + (s.note ? '10px' : '0') + '">' + s.action + '</div>' : '') +
+    (s.note ? '<div style="font-size:11px;color:rgba(255,255,255,0.4);background:rgba(255,255,255,0.04);border-radius:8px;padding:8px 10px;line-height:1.5">' + s.note + '</div>' : '') +
+    '</div></div>'
+  ).join('');
+
+  const closeId = cfg.id;
+  el.innerHTML =
+    '<div style="background:#141820;border:2px solid ' + cfg.color + '33;border-radius:24px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,0.8)">' +
+    '<div style="background:linear-gradient(135deg,' + cfg.color + '22,' + cfg.color + '11);padding:24px 24px 20px;border-bottom:1px solid rgba(255,255,255,0.07);position:sticky;top:0;border-radius:22px 22px 0 0;backdrop-filter:blur(20px)">' +
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">' +
+    '<div style="display:flex;align-items:center;gap:14px">' +
+    '<div style="width:52px;height:52px;border-radius:14px;background:' + cfg.iconBg + ';border:2px solid ' + cfg.iconBorder + ';display:flex;align-items:center;justify-content:center;flex-shrink:0">' + cfg.icon + '</div>' +
+    '<div><div style="font-size:18px;font-weight:900;color:#fff;margin-bottom:3px">' + cfg.title + '</div>' +
+    '<div style="font-size:12px;color:rgba(255,255,255,0.45)">' + cfg.subtitle + '</div></div>' +
+    '</div>' +
+    '<button onclick="window._closeGuideById(this)" data-guide-id="' + closeId + '" style="flex-shrink:0;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">&#x2715;</button>' +
+    '</div></div>' +
+    '<div style="padding:20px 24px 28px;display:flex;flex-direction:column;gap:10px">' +
+    stepsHTML +
+    '<div style="margin-top:8px;padding:14px;background:' + cfg.color + '11;border:1px solid ' + cfg.color + '33;border-radius:12px;display:flex;gap:10px;align-items:flex-start">' +
+    '<span style="font-size:18px;flex-shrink:0">' + cfg.footer.icon + '</span>' +
+    '<div style="font-size:12px;color:rgba(255,255,255,0.5);line-height:1.6">' + cfg.footer.text + '</div>' +
+    '</div>' +
+    '<button onclick="window._closeGuideById(this)" data-guide-id="' + closeId + '" style="width:100%;margin-top:4px;padding:14px;border-radius:14px;background:' + cfg.color + '22;border:2px solid ' + cfg.color + '55;color:' + cfg.color + ';font-weight:700;font-size:14px;cursor:pointer">Ho capito, chiudi la guida</button>' +
+    '</div></div>';
+
+  document.body.appendChild(el);
+  el.addEventListener('click', e => { if (e.target === el) el.remove(); });
+}
 
 window._saveGDriveToken = function() {
   var inp = document.getElementById('sett-gdrive-token');
@@ -1745,7 +1910,7 @@ function load() {
 
   if (!parsed) {
     console.log('[AFP] Nessun dato trovato in localStorage');
-    return;
+    return false; // nessun dato caricato
   }
 
   // Applica i dati
@@ -1764,12 +1929,21 @@ function load() {
     save();
     console.log('[AFP] Migrati dati da ' + foundKey + ' → ' + LS_KEY);
   }
+
+  return true; // dati caricati con successo
 }
 
 function loadFromIDB() {
-  load();
+  const loaded = load();
   render();
   updateSaveBtn();
+  // Toast di conferma solo se ci sono dati effettivi
+  if (loaded && DB.datasets.length > 0) {
+    setTimeout(() => {
+      const tot = DB.datasets.reduce((s, ds) => s + ds.rows.length, 0);
+      toast('\u23f3 Database ripristinato: ' + DB.datasets.length + ' dataset, ' + tot + ' righe');
+    }, 600);
+  }
 }
 
 // ============================================================
@@ -2652,7 +2826,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 14:09</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 14:32</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -3312,10 +3486,62 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260222-140927';
+const APP_VERSION = '20260222-143251';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
+
+// ── Auto-load unificato all'avvio ────────────────────────────────────────
+// localStorage: già caricato da loadFromIDB() — il toast è gestito lì.
+// Cloud (GDrive): se DB è ancora vuoto dopo localStorage, tenta auto-load.
+(function autoLoadCloud() {
+  if (DB.datasets.length > 0) return; // già caricato da localStorage ✓
+
+  const method = SETTINGS.saveMethod;
+
+  // GDrive: cerca e carica il file più recente automaticamente
+  if (method === 'gdrive' && SETTINGS.gdrive_token) {
+    setTimeout(() => {
+      const token = SETTINGS.gdrive_token;
+      toast('\u23f3 Ricerca database su Google Drive...');
+      fetch("https://www.googleapis.com/drive/v3/files?q=name+contains+'DB_Analisi_Fatturato_PRO'&orderBy=modifiedTime+desc&pageSize=1&fields=files(id,name,modifiedTime)", {
+        headers: { Authorization: 'Bearer ' + token }
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (!data.files || !data.files.length) {
+          toast('\u2601\ufe0f Nessun database trovato su Google Drive');
+          return;
+        }
+        const f    = data.files[0];
+        const date = new Date(f.modifiedTime).toLocaleDateString('it-IT', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+        return fetch('https://www.googleapis.com/drive/v3/files/' + f.id + '?alt=media', {
+          headers: { Authorization: 'Bearer ' + token }
+        })
+        .then(r => r.json())
+        .then(parsed => {
+          const result = _parsePayload(JSON.stringify(parsed));
+          if (!result || !result.datasets.length) return;
+          DB.datasets = result.datasets;
+          window._excludedClients = result.excl || [];
+          save(); render(); markSaved();
+          const tot = DB.datasets.reduce((s, ds) => s + ds.rows.length, 0);
+          toast('\u2601\ufe0f Database caricato da Google Drive: ' + DB.datasets.length + ' dataset, ' + tot + ' righe · ' + date);
+        });
+      })
+      .catch(() => {}); // silenzioso se offline o token scaduto
+    }, 600);
+    return;
+  }
+
+  // Dropbox / OneDrive / Local senza dati: nessun auto-load possibile,
+  // mostra solo un messaggio discreto dopo un attimo
+  if (method && method !== '') {
+    setTimeout(() => {
+      toast('\ud83d\udce2 Nessun dato in memoria — usa Carica Dati per ripristinare il database');
+    }, 1000);
+  }
+})();
 
 // Banner avviso percorso salvataggio non configurato
 (function checkSaveMethod() {
