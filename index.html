@@ -782,6 +782,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.85);color:rgba(255,255,255,0.85)">Andrea Muraro</strong></div>
+          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px"></div>
         </div>
       </div>
       <div class="header-actions">
@@ -935,6 +936,9 @@ function saveSession() {
     return;
   }
 
+  // Salva SEMPRE su localStorage prima di tutto — backup istantaneo
+  save();
+
   const payload = {
     _version: 2,
     _saved: new Date().toISOString(),
@@ -1065,41 +1069,26 @@ function updateSaveBtn() {
 }
 
 // ============================================================
-// PERSISTENZA INTERNA — IndexedDB (nessun limite di spazio)
+// PERSISTENZA — localStorage semplice e affidabile su iOS PWA
 // ============================================================
-const IDB_NAME    = 'VenditePro';
-const IDB_STORE   = 'sessione';
-const IDB_KEY     = 'main';
-let   _idb        = null; // riferimento al DB aperto
-
-function openIDB() {
-  return new Promise((resolve, reject) => {
-    if (_idb) { resolve(_idb); return; }
-    const req = indexedDB.open(IDB_NAME, 1);
-    req.onupgradeneeded = e => {
-      e.target.result.createObjectStore(IDB_STORE);
-    };
-    req.onsuccess = e => { _idb = e.target.result; resolve(_idb); };
-    req.onerror   = e => reject(e.target.error);
-  });
-}
+const LS_KEY = 'analisi_fatturato_pro_v1';
 
 function buildPayload() {
   return {
-    _version:        2,
-    _saved:          new Date().toISOString(),
-    excludedClients: window._excludedClients || [],
-    datasets: DB.datasets.map(ds => ({
-      id:          ds.id,
-      name:        ds.name,
-      date:        ds.date,
-      commerciale: ds.commerciale,
+    _v: 3,
+    _ts: Date.now(),
+    excl: window._excludedClients || [],
+    ds: DB.datasets.map(ds => ({
+      id: ds.id,
+      name: ds.name,
+      date: ds.date,
+      comm: ds.commerciale,
       rows: ds.rows.map(r => ({
-        cliente:     r.cliente,
-        fattura:     r.fattura,
-        data:        r.data,
-        importo:     r.importo,
-        commerciale: r.commerciale
+        c: r.cliente,
+        f: r.fattura,
+        d: r.data,
+        i: r.importo,
+        v: r.commerciale
       }))
     }))
   };
@@ -1107,95 +1096,51 @@ function buildPayload() {
 
 function save() {
   if (!DB.datasets.length) return;
-  const payload = buildPayload();
-  const json = JSON.stringify(payload);
-
-  // 1. localStorage: sincrono, sopravvive a chiusura immediata
   try {
-    localStorage.setItem('vendite_pro_v2', json);
-    console.log('[VenditePro] Salvato su localStorage (' + (json.length/1024).toFixed(0) + ' KB)');
+    const json = JSON.stringify(buildPayload());
+    localStorage.setItem(LS_KEY, json);
+    console.log('[AFP] Salvato ' + DB.datasets.length + ' dataset (' + (json.length/1024).toFixed(0) + ' KB)');
   } catch(e) {
-    console.warn('[VenditePro] localStorage pieno:', e.message);
+    console.error('[AFP] Errore salvataggio:', e);
+    if (e.name === 'QuotaExceededError') {
+      toast('\u26a0\ufe0f Dati troppo grandi per il browser. Usa Esporta per fare un backup.', 'error');
+    }
   }
-
-  // 2. IndexedDB: asincrono, usato come backup (nessun limite di spazio)
-  openIDB().then(db => {
-    const tx = db.transaction(IDB_STORE, 'readwrite');
-    tx.objectStore(IDB_STORE).put(payload, IDB_KEY);
-  }).catch(() => {});
 }
 
 function load() {
-  // Non fa nulla — il caricamento è asincrono, gestito da loadFromIDB()
+  try {
+    const json = localStorage.getItem(LS_KEY);
+    if (!json) { console.log('[AFP] Nessun dato salvato'); return; }
+    const p = JSON.parse(json);
+    if (!p || !Array.isArray(p.ds)) { console.log('[AFP] Formato non valido'); return; }
+    // Ricostruisci DB dal formato compresso
+    DB.datasets = p.ds.map(ds => ({
+      id:          ds.id,
+      name:        ds.name,
+      date:        ds.date,
+      commerciale: ds.comm,
+      rows: ds.rows.map(r => ({
+        cliente:     r.c,
+        fattura:     r.f,
+        data:        r.d,
+        importo:     r.i,
+        commerciale: r.v,
+        dataObj:     (r.d && r.d.trim()) ? parseDate(r.d) : null
+      }))
+    }));
+    window._excludedClients = Array.isArray(p.excl) ? p.excl : [];
+    console.log('[AFP] Caricati ' + DB.datasets.length + ' dataset da localStorage');
+  } catch(e) {
+    console.error('[AFP] Errore caricamento:', e);
+  }
 }
 
 function loadFromIDB() {
-  let data = null;
-
-  // 1. PRIORITÀ MASSIMA: dati incorporati nel file HTML (salvato con saveSession)
-  if (window.__EMBEDDED_DATA__ && Array.isArray(window.__EMBEDDED_DATA__.datasets)) {
-    data = window.__EMBEDDED_DATA__;
-    // Pulisci dalla memoria per non interferire con salvataggi futuri
-    delete window.__EMBEDDED_DATA__;
-    console.log('[VenditePro] Dati incorporati nel file HTML trovati (' + data.datasets.length + ' dataset)');
-  }
-
-  // 2. Fallback: localStorage
-  if (!data) {
-    try {
-      const ls = localStorage.getItem('vendite_pro_v2');
-      if (ls) {
-        const parsed = JSON.parse(ls);
-        if (parsed && Array.isArray(parsed.datasets)) {
-          data = parsed;
-          console.log('[VenditePro] Dati caricati da localStorage (' + data.datasets.length + ' dataset)');
-        }
-      }
-    } catch(e) {}
-  }
-
-  // 3. Fallback: IndexedDB
-  if (data) {
-    _applyLoadedData(data);
-    // Sincronizza localStorage e IDB con i dati trovati
-    try { localStorage.setItem('vendite_pro_v2', JSON.stringify(data)); } catch(_) {}
-    openIDB().then(db => {
-      db.transaction(IDB_STORE, 'readwrite').objectStore(IDB_STORE).put(data, IDB_KEY);
-    }).catch(() => {});
-    render();
-    updateSaveBtn();
-    return Promise.resolve();
-  }
-
-  return openIDB().then(db => {
-    return new Promise((resolve, reject) => {
-      const req = db.transaction(IDB_STORE, 'readonly')
-                    .objectStore(IDB_STORE).get(IDB_KEY);
-      req.onsuccess = e => resolve(e.target.result);
-      req.onerror   = e => reject(e.target.error);
-    });
-  }).then(idbData => {
-    if (idbData && Array.isArray(idbData.datasets)) {
-      console.log('[VenditePro] Dati caricati da IndexedDB (' + idbData.datasets.length + ' dataset)');
-      _applyLoadedData(idbData);
-      try { localStorage.setItem('vendite_pro_v2', JSON.stringify(idbData)); } catch(_) {}
-    } else {
-      console.log('[VenditePro] Nessun dato trovato — app pulita');
-    }
-    render();
-    updateSaveBtn();
-  }).catch(e => {
-    console.error('[VenditePro] Errore IDB:', e);
-    render();
-  });
-}
-
-function _applyLoadedData(data) {
-  DB = { datasets: data.datasets };
-  window._excludedClients = Array.isArray(data.excludedClients) ? data.excludedClients : [];
-  DB.datasets.forEach(ds => ds.rows.forEach(r => {
-    r.dataObj = (r.data && r.data.trim()) ? parseDate(r.data) : null;
-  }));
+  // Alias per compatibilità — ora usa solo localStorage
+  load();
+  render();
+  updateSaveBtn();
 }
 
 // ============================================================
@@ -1539,7 +1484,7 @@ if (window._showAllClients === undefined) window._showAllClients = false;
           <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#e05c5c;background:rgba(224,92,92,0.15);border:1.5px solid rgba(224,92,92,0.45);border-radius:20px;padding:3px 10px">
             ✕ ${(window._excludedClients||[]).length} esclus${(window._excludedClients||[]).length===1?'o':'i'}
           </span>
-          <button onclick="window._excludedClients=[];markUnsaved();render()"
+          <button onclick="window._excludedClients=[];markUnsaved();save();render()"
             style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;border:1.5px solid rgba(76,175,130,0.55);background:rgba(76,175,130,0.12);color:#4caf82;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.18s"
             onmouseenter="this.style.background='rgba(76,175,130,0.22)'"
             onmouseleave="this.style.background='rgba(76,175,130,0.12)'">
@@ -1582,7 +1527,7 @@ if (window._showAllClients === undefined) window._showAllClients = false;
             : (isSub ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#4caf82;background:rgba(76,175,130,0.12);border:1px solid rgba(76,175,130,0.35);border-radius:20px;padding:2px 8px;flex-shrink:0;margin-left:4px">↑ nuovo</span>' : '');
           const hoverBg = isExcl ? 'rgba(224,92,92,0.18)' : 'rgba(255,255,255,0.05)';
           const leaveBg = isExcl ? 'rgba(224,92,92,0.12)' : (isExtra ? 'rgba(116,185,255,0.04)' : 'transparent');
-          return '<div onclick="(function(){if(!window._excludedClients)window._excludedClients=[];var i=window._excludedClients.indexOf(\'' + safeName + '\');if(i>=0)window._excludedClients.splice(i,1);else window._excludedClients.push(\'' + safeName + '\');markUnsaved();render();})()"'
+          return '<div onclick="(function(){if(!window._excludedClients)window._excludedClients=[];var i=window._excludedClients.indexOf(\'' + safeName + '\');if(i>=0)window._excludedClients.splice(i,1);else window._excludedClients.push(\'' + safeName + '\');markUnsaved();save();render();})()"'
             + ' style="margin-bottom:8px;cursor:pointer;padding:10px 12px;border-radius:10px;transition:all 0.18s;' + bg + borderStyle + '"'
             + ' onmouseenter="this.style.background=\'' + hoverBg + '\'"'
             + ' onmouseleave="this.style.background=\'' + leaveBg + '\'">'
@@ -2774,48 +2719,9 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-// ── Service Worker con versioning automatico ──────────────────────
 const APP_VERSION = '20260222091638';
 
-(function registerSW() {
-  if (!('serviceWorker' in navigator)) return;
-
-  const swCode = atob('Y29uc3QgQ0FDSEVfVkVSU0lPTiA9ICcyMDI2MDIyMjA5MTYzOCc7CmNvbnN0IENBQ0hFID0gJ2FuYWxpc2ktZmF0dHVyYXRvLScgKyBDQUNIRV9WRVJTSU9OOwoKc2VsZi5hZGRFdmVudExpc3RlbmVyKCdpbnN0YWxsJywgZSA9PiB7CiAgZS53YWl0VW50aWwoY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oYyA9PiBjLmFkZEFsbChbJy4vJ10pKSk7CiAgc2VsZi5za2lwV2FpdGluZygpOwp9KTsKCnNlbGYuYWRkRXZlbnRMaXN0ZW5lcignYWN0aXZhdGUnLCBlID0+IHsKICBlLndhaXRVbnRpbCgKICAgIGNhY2hlcy5rZXlzKCkudGhlbihrZXlzID0+CiAgICAgIFByb21pc2UuYWxsKGtleXMuZmlsdGVyKGsgPT4gayAhPT0gQ0FDSEUpLm1hcChrID0+IGNhY2hlcy5kZWxldGUoaykpKQogICAgKS50aGVuKCgpID0+IHNlbGYuY2xpZW50cy5jbGFpbSgpKQogICk7Cn0pOwoKc2VsZi5hZGRFdmVudExpc3RlbmVyKCdmZXRjaCcsIGUgPT4gewogIGNvbnN0IGlzSFRNTCA9IGUucmVxdWVzdC5kZXN0aW5hdGlvbiA9PT0gJ2RvY3VtZW50JzsKICBpZiAoaXNIVE1MKSB7CiAgICBlLnJlc3BvbmRXaXRoKAogICAgICBmZXRjaChlLnJlcXVlc3QpLnRoZW4ocmVzID0+IHsKICAgICAgICBjb25zdCBjbG9uZSA9IHJlcy5jbG9uZSgpOwogICAgICAgIGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGMgPT4gYy5wdXQoZS5yZXF1ZXN0LCBjbG9uZSkpOwogICAgICAgIHJldHVybiByZXM7CiAgICAgIH0pLmNhdGNoKCgpID0+IGNhY2hlcy5tYXRjaChlLnJlcXVlc3QpKQogICAgKTsKICB9IGVsc2UgewogICAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGNhY2hlZCA9PiBjYWNoZWQgfHwgZmV0Y2goZS5yZXF1ZXN0KSkpOwogIH0KfSk7CgpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoJ21lc3NhZ2UnLCBlID0+IHsKICBpZiAoZS5kYXRhID09PSAnQ0hFQ0tfVVBEQVRFJykgewogICAgZS5zb3VyY2UucG9zdE1lc3NhZ2UoeyB0eXBlOiAnU1dfVkVSU0lPTicsIHZlcnNpb246IENBQ0hFX1ZFUlNJT04gfSk7CiAgfQp9KTsK');
-  const swBlob = new Blob([swCode], { type: 'application/javascript' });
-  const swUrl  = URL.createObjectURL(swBlob);
-
-  navigator.serviceWorker.register(swUrl, { scope: './' })
-    .then(reg => {
-      console.log('[SW] Attivo · build:', APP_VERSION);
-
-      // Controlla aggiornamenti quando l'app torna visibile
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') reg.update();
-      });
-
-      // Ricevi notifica dal SW se la versione è cambiata
-      navigator.serviceWorker.addEventListener('message', e => {
-        if (e.data && e.data.type === 'SW_VERSION' && e.data.version !== APP_VERSION) {
-          const t = document.createElement('div');
-          t.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1a1f2a;border:2px solid #4caf82;color:#fff;padding:14px 20px;border-radius:14px;font-size:13px;font-weight:600;z-index:99999;display:flex;align-items:center;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,0.5);white-space:nowrap';
-          t.innerHTML = '\uD83D\uDD04 Nuova versione disponibile! <button onclick="location.reload(true)" style="background:#4caf82;border:none;color:#fff;padding:6px 14px;border-radius:8px;font-weight:700;cursor:pointer;font-size:12px;font-family:sans-serif">Aggiorna ora</button>';
-          document.body.appendChild(t);
-        }
-      });
-
-      // Chiedi la versione al SW attivo
-      const askVersion = (sw) => { if (sw) sw.postMessage('CHECK_UPDATE'); };
-      askVersion(reg.active);
-      reg.addEventListener('updatefound', () => {
-        reg.installing.addEventListener('statechange', function() {
-          if (this.state === 'activated') askVersion(this);
-        });
-      });
-    })
-    .catch(e => console.log('[SW] Non supportato:', e.message));
-})();
-
-loadFromIDB(); // carica da IndexedDB (asincrono) poi chiama render()
+loadFromIDB(); // carica da localStorage e mostra i dati
 
 // Mostra banner installazione iOS se non già installata
 (function checkPWA() {
@@ -2877,8 +2783,7 @@ function showCloseDialog() {
 
 // Intercetta chiusura scheda/finestra
 window.addEventListener('beforeunload', function(e) {
-  // Salva sempre su IDB prima di chiudere (silenzioso)
-  save();
+  save(); // salva su localStorage prima di chiudere
   // Se ci sono modifiche non salvate su .json, mostra avviso nativo
   if (_unsavedChanges && DB.datasets.length > 0) {
     e.preventDefault();
@@ -2891,12 +2796,10 @@ window.addEventListener('beforeunload', function(e) {
 document.addEventListener('visibilitychange', function() {
   if (document.visibilityState === 'hidden' && DB.datasets.length > 0) {
     save();
-    console.log('[VenditePro] Auto-salvataggio su IDB (app in background)');
+    console.log('[AFP] Auto-salvataggio in background');
   }
 });
 
-// Override pulsante Salva File (.json): mostra dialog completo se ci sono dati
-const _origSaveSession = saveSession;
 </script>
 </body>
 </html>
