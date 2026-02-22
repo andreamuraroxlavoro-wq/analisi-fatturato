@@ -793,7 +793,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.85);color:rgba(255,255,255,0.85)">Andrea Muraro</strong></div>
-          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 17:56</div>
+          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 18:22</div>
         </div>
       </div>
       <div class="header-actions">
@@ -1028,21 +1028,13 @@ function loadSession() {
 // ── Salva Dati: gestisce modalità e dialogo ───────────────────────────────
 function onCaricaDatiClick() {
   const method = SETTINGS.saveMethod;
-  if (!method) {
-    // Nessun metodo: apri selettore file generico
+  if (!method || method === 'local') {
     document.getElementById('session-input').click();
     return;
   }
-  if (method === 'local') {
-    // Locale: apri selettore file
-    document.getElementById('session-input').click();
-    return;
-  }
-  if (method === 'gdrive') {
-    loadFromGDrive();
-    return;
-  }
-  // Dropbox / OneDrive: selettore file per ora
+  if (method === 'gdrive')   { loadFromGDrive();   return; }
+  if (method === 'dropbox')  { loadFromDropbox();  return; }
+  if (method === 'onedrive') { loadFromOneDrive(); return; }
   document.getElementById('session-input').click();
 }
 
@@ -1719,6 +1711,122 @@ function loadFromGDrive() {
   .catch(e => toast('Errore rete: ' + e.message, 'error'));
 }
 
+function loadFromDropbox() {
+  const token = SETTINGS.dropbox_token;
+  if (!token) { toast('Token Dropbox non configurato — vai in Impostazioni', 'error'); return; }
+  toast('\u23f3 Ricerca file su Dropbox...');
+
+  // Cerca tutti i file DB_Analisi_Fatturato_PRO nella cartella dell'app
+  const tryList = (path) => {
+    return fetch('https://api.dropboxapi.com/2/files/list_folder', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: path, recursive: false })
+    }).then(r => r.json());
+  };
+
+  // Prova prima path root (App Folder), poi /AnalisiFatturatoPRO (Full Dropbox)
+  tryList('')
+  .then(data => {
+    if (data.error_summary) return tryList('/AnalisiFatturatoPRO');
+    return data;
+  })
+  .then(data => {
+    if (!data || data.error_summary) {
+      toast('Errore Dropbox: ' + (data && data.error_summary || 'impossibile leggere la cartella'), 'error');
+      return;
+    }
+    const files = (data.entries || [])
+      .filter(f => f['.tag'] === 'file' && f.name.startsWith('DB_Analisi_Fatturato_PRO'))
+      .sort((a, b) => (b.server_modified || '').localeCompare(a.server_modified || ''));
+
+    if (!files.length) { toast('Nessun file trovato su Dropbox', 'error'); return; }
+    if (files.length === 1) {
+      _downloadDropboxFile(files[0].path_lower, files[0].name, token);
+    } else {
+      _showDropboxPickModal(files, token);
+    }
+  })
+  .catch(e => toast('Errore rete Dropbox: ' + e.message, 'error'));
+}
+
+function _downloadDropboxFile(path, fname, token) {
+  toast('\u23f3 Caricamento ' + fname + ' da Dropbox...');
+  fetch('https://content.dropboxapi.com/2/files/download', {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Dropbox-API-Arg': JSON.stringify({ path: path })
+    }
+  })
+  .then(r => r.text())
+  .then(txt => {
+    const result = _parsePayload(txt);
+    if (!result || !result.datasets.length) { toast('File non valido o vuoto', 'error'); return; }
+    DB.datasets = result.datasets;
+    window._excludedClients = result.excl || [];
+    save(); render(); markSaved();
+    const tot = DB.datasets.reduce((s, ds) => s + ds.rows.length, 0);
+    toast('\u2713 ' + fname + ' caricato: ' + DB.datasets.length + ' dataset, ' + tot + ' righe');
+  })
+  .catch(e => toast('Errore download Dropbox: ' + e.message, 'error'));
+}
+
+window._closeDropboxPick = function() {
+  var o = document.getElementById('dropbox-pick-overlay');
+  if (o) o.remove();
+};
+window._pickDropbox = function(btn) {
+  var o = document.getElementById('dropbox-pick-overlay');
+  if (o) o.remove();
+  _downloadDropboxFile(btn.getAttribute('data-path'), btn.getAttribute('data-name'), SETTINGS.dropbox_token);
+};
+
+function _showDropboxPickModal(files, token) {
+  const el = document.createElement('div');
+  el.id = 'dropbox-pick-overlay';
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:99999;display:flex;align-items:flex-end;justify-content:center';
+  const rows = files.map(f => {
+    const date = f.server_modified ? new Date(f.server_modified).toLocaleDateString('it-IT', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+    return '<button onclick="window._pickDropbox(this)" data-path="' + f.path_lower + '" data-name="' + f.name + '" style="width:100%;padding:14px;border-radius:12px;background:rgba(255,255,255,0.05);border:1.5px solid rgba(255,255,255,0.1);color:#fff;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;font-weight:700">' + f.name + '</span><span style="font-size:11px;color:rgba(255,255,255,0.4)">' + date + '</span></button>';
+  }).join('');
+  el.innerHTML = '<div style="background:#1a1f2a;border:2px solid rgba(0,97,255,0.4);border-radius:20px 20px 0 0;padding:28px 24px 44px;width:100%;max-width:480px;max-height:80vh;overflow-y:auto"><div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><svg viewBox="0 0 43.1 40.5" width="20" height="20"><path fill="#0061ff" d="M12.8 0L0 8.2l12.8 8.2 12.8-8.2zM38.3 0L25.5 8.2l12.8 8.2 12.8-8.2zM0 24.7l12.8 8.2 12.8-8.2-12.8-8.2zM38.3 16.5l-12.8 8.2 12.8 8.2 12.8-8.2zM12.8 28.1l12.8 8.2 12.8-8.2-12.8-8.2z"/></svg><div style="font-size:17px;font-weight:800;color:#fff">Scegli file da Dropbox</div></div><div style="font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:18px">File trovati — dal più recente</div><div style="display:flex;flex-direction:column;gap:8px">' + rows + '</div><button onclick="window._closeDropboxPick()" style="width:100%;margin-top:12px;padding:13px;border-radius:14px;background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.5);font-size:13px;font-weight:600;cursor:pointer">Annulla</button></div>';
+  document.body.appendChild(el);
+  el.addEventListener('click', e => { if (e.target === el) el.remove(); });
+}
+
+function loadFromOneDrive() {
+  const token = SETTINGS.onedrive_token;
+  if (!token) { toast('Token OneDrive non configurato — vai in Impostazioni', 'error'); return; }
+  toast('\u23f3 Ricerca file su OneDrive...');
+  fetch("https://graph.microsoft.com/v1.0/me/drive/special/approot/children?$filter=startswith(name,'DB_Analisi_Fatturato_PRO')&$orderby=lastModifiedDateTime desc", {
+    headers: { Authorization: 'Bearer ' + token }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) { toast('Errore OneDrive: ' + data.error.message, 'error'); return; }
+    const files = data.value || [];
+    if (!files.length) { toast('Nessun file trovato su OneDrive', 'error'); return; }
+    // Carica il più recente direttamente
+    const f = files[0];
+    toast('\u23f3 Caricamento ' + f.name + ' da OneDrive...');
+    fetch('https://graph.microsoft.com/v1.0/me/drive/items/' + f.id + '/content', {
+      headers: { Authorization: 'Bearer ' + token }
+    })
+    .then(r => r.text())
+    .then(txt => {
+      const result = _parsePayload(txt);
+      if (!result || !result.datasets.length) { toast('File non valido o vuoto', 'error'); return; }
+      DB.datasets = result.datasets;
+      window._excludedClients = result.excl || [];
+      save(); render(); markSaved();
+      const tot = DB.datasets.reduce((s, ds) => s + ds.rows.length, 0);
+      toast('\u2713 ' + f.name + ' caricato: ' + DB.datasets.length + ' dataset, ' + tot + ' righe');
+    });
+  })
+  .catch(e => toast('Errore rete OneDrive: ' + e.message, 'error'));
+}
+
 window._closeGDrivePick = function() {
   var o = document.getElementById('gdrive-pick-overlay');
   if (o) o.remove();
@@ -1765,49 +1873,67 @@ function saveToDropbox(blob, fname) {
   const token = SETTINGS.dropbox_token;
   if (!token) { toast('Token Dropbox non configurato — vai in Impostazioni', 'error'); return; }
 
-  // Controlla prima quale tipo di app è (App Folder o Full Dropbox)
-  // usando get_current_account per vedere il namespace
-  fetch('https://api.dropboxapi.com/2/users/get_current_account', {
+  // Step 1: verifica spazio disponibile e validità token
+  fetch('https://api.dropboxapi.com/2/users/get_space_usage', {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
     body: 'null'
   })
   .then(r => r.json())
-  .then(account => {
-    if (account.error_summary) {
+  .then(usage => {
+    if (usage.error_summary) {
       toast('Token Dropbox non valido — rigeneralo in Impostazioni', 'error');
+      console.error('[AFP] Token check:', usage);
       return;
     }
-    // App Folder: path = /{fname}
-    // Full Dropbox: path = /AnalisiFatturatoPRO/{fname}
-    // Lo scopriamo guardando se l'account ha un root_namespace_id diverso
-    // Per sicurezza proviamo prima /{fname} (App Folder)
-    _dropboxTryUpload(blob, fname, token, '/' + fname, true);
+    // Calcola spazio libero
+    const used      = usage.used || 0;
+    const allocated = usage.allocation && usage.allocation.allocated ? usage.allocation.allocated : 0;
+    const free      = allocated - used;
+    console.log('[AFP] Dropbox spazio libero: ' + Math.round(free/1024/1024) + ' MB');
+    if (allocated > 0 && free < 1024 * 100) { // meno di 100KB liberi
+      toast('Dropbox: spazio insufficiente (' + Math.round(free/1024) + ' KB liberi)', 'error');
+      return;
+    }
+    // Step 2: upload del file
+    _dropboxUploadDirect(blob, fname, token);
   })
-  .catch(() => _dropboxTryUpload(blob, fname, token, '/' + fname, true));
+  .catch(() => {
+    // Se check spazio fallisce, prova comunque l'upload
+    _dropboxUploadDirect(blob, fname, token);
+  });
 }
 
-function _dropboxTryUpload(blob, fname, token, path, retryWithFull) {
-  blob.arrayBuffer().then(buf => {
-    fetch('https://content.dropboxapi.com/2/files/upload', {
-      method: 'POST',
-      headers: {
-        Authorization: 'Bearer ' + token,
-        'Content-Type': 'application/octet-stream',
-        'Dropbox-API-Arg': JSON.stringify({
-          path: path,
-          mode: { '.tag': 'overwrite' },
-          autorename: false,
-          mute: false,
-          strict_conflict: false
-        })
-      },
-      body: buf
-    })
-    .then(r => r.text().then(txt => ({ status: r.status, txt })))
+function _dropboxUploadDirect(blob, fname, token) {
+  // Converte blob in testo (il file è JSON quindi è piccolo)
+  blob.text().then(text => {
+    const encoder = new TextEncoder();
+    const buf     = encoder.encode(text);
+
+    // Prova prima con path App Folder /{fname}
+    // poi con /AnalisiFatturatoPRO/{fname} se fallisce
+    const tryUpload = (path) => {
+      return fetch('https://content.dropboxapi.com/2/files/upload', {
+        method: 'POST',
+        headers: {
+          Authorization:    'Bearer ' + token,
+          'Content-Type':   'application/octet-stream',
+          'Dropbox-API-Arg': JSON.stringify({
+            path:            path,
+            mode:            'overwrite',
+            autorename:      false,
+            mute:            false
+          })
+        },
+        body: buf
+      }).then(r => r.text().then(txt => ({ status: r.status, txt })));
+    };
+
+    tryUpload('/' + fname)
     .then(({ status, txt }) => {
       let data;
-      try { data = JSON.parse(txt); } catch(e) { data = { raw: txt }; }
+      try { data = JSON.parse(txt); } catch(e) { data = {}; }
+      console.log('[AFP] Dropbox risposta path=/' + fname + ' status=' + status + ':', txt);
 
       if (status === 200 && (data.id || data.name)) {
         save(); markSaved();
@@ -1815,29 +1941,29 @@ function _dropboxTryUpload(blob, fname, token, path, retryWithFull) {
         return;
       }
 
-      const errSum = (data.error_summary || '');
-      console.error('[AFP] Dropbox HTTP ' + status + ':', txt);
+      // Riprova con path Full Dropbox
+      return tryUpload('/AnalisiFatturatoPRO/' + fname)
+      .then(({ status: s2, txt: txt2 }) => {
+        let d2;
+        try { d2 = JSON.parse(txt2); } catch(e) { d2 = {}; }
+        console.log('[AFP] Dropbox retry path=/AnalisiFatturatoPRO/ status=' + s2 + ':', txt2);
 
-      // Se insufficient_space con path App Folder, riprova con Full Dropbox path
-      if (errSum.includes('insufficient_space') && retryWithFull && path === '/' + fname) {
-        toast('\u23f3 Riprovo con percorso Full Dropbox...');
-        _dropboxTryUpload(blob, fname, token, '/AnalisiFatturatoPRO/' + fname, false);
-        return;
-      }
+        if (s2 === 200 && (d2.id || d2.name)) {
+          save(); markSaved();
+          toast('\u2713 Salvato su Dropbox: ' + fname);
+          return;
+        }
 
-      if (errSum.includes('insufficient_space')) {
-        toast('Errore Dropbox: spazio insufficiente. Verifica il tuo account Dropbox.', 'error');
-      } else if (status === 401) {
-        toast('Token Dropbox scaduto o non valido — rigeneralo in Impostazioni', 'error');
-      } else if (status === 409) {
-        toast('Errore Dropbox 409: ' + errSum + ' — assicurati che i permessi siano corretti e rigenera il token', 'error');
-      } else {
-        toast('Errore Dropbox (' + status + '): ' + (errSum || txt.substring(0, 80)), 'error');
-      }
+        // Entrambi falliti — mostra errore dettagliato
+        const err = (d2.error_summary || data.error_summary || txt2).substring(0, 120);
+        toast('Errore Dropbox: ' + err, 'error');
+        console.error('[AFP] Dropbox tutti i path falliti. Ultimo errore:', txt2);
+      });
     })
     .catch(e => toast('Errore rete Dropbox: ' + e.message, 'error'));
   });
 }
+
 
 // ── OneDrive ─────────────────────────────────────────────────────────────
 function saveToOneDrive(blob, fname) {
@@ -2940,7 +3066,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 17:56</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 18:22</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -3600,7 +3726,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260222-175655';
+const APP_VERSION = '20260222-182259';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
