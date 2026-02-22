@@ -402,7 +402,7 @@
   }
 
   /* KPI ROW */
-  .kpi-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .kpi-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 0; }
   .kpi-card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -806,7 +806,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.82);color:rgba(255,255,255,0.82);font-weight:700">Andrea Muraro</strong></div>
-          <div id="header-version">v 2026.02.22 - 23:05</div>
+          <div id="header-version">v 2026.02.22 - 23:12</div>
         </div>
       </div>
       <div class="header-actions">
@@ -2439,30 +2439,6 @@ if (window._showAllClients === undefined) window._showAllClients = false;
 
     </div>
 
-    <!-- KPI -->
-    <div id="dash-kpi-row" class="kpi-row">
-      <div class="kpi-card">
-        <div class="kpi-label">Fatturato</div>
-        <div id="dash-kpi-fatturato" class="kpi-value">${fmtK(totalF)}</div>
-        <div id="dash-kpi-fatturato-sub" class="kpi-sub">${fmtEur(totalF)}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Fatture</div>
-        <div id="dash-kpi-fatture" class="kpi-value">${filtered.length}</div>
-        <div class="kpi-sub">nel periodo</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Clienti attivi</div>
-        <div id="dash-kpi-clienti" class="kpi-value">${new Set(filtered.map(r=>r.cliente)).size}</div>
-        <div id="dash-kpi-clienti-sub" class="kpi-sub">totale: ${clientiTot}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Media fattura</div>
-        <div id="dash-kpi-media" class="kpi-value">${fmtK(filtered.length ? totalF/filtered.length : 0)}</div>
-        <div class="kpi-sub">per fattura</div>
-      </div>
-    </div>
-
     ${months.length > 1 ? `
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -2526,6 +2502,30 @@ if (window._showAllClients === undefined) window._showAllClients = false;
           + '</div>'
         + '</div>';
       })()}</div>
+
+      <!-- KPI — spostati sotto la media mensile -->
+      <div id="dash-kpi-row" class="kpi-row" style="margin-top:16px;margin-bottom:0">
+        <div class="kpi-card">
+          <div class="kpi-label">Fatturato</div>
+          <div id="dash-kpi-fatturato" class="kpi-value">${fmtK(totalF)}</div>
+          <div id="dash-kpi-fatturato-sub" class="kpi-sub">${fmtEur(totalF)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Fatture</div>
+          <div id="dash-kpi-fatture" class="kpi-value">${filtered.length}</div>
+          <div class="kpi-sub">nel periodo</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Clienti attivi</div>
+          <div id="dash-kpi-clienti" class="kpi-value">${new Set(filtered.map(r=>r.cliente)).size}</div>
+          <div id="dash-kpi-clienti-sub" class="kpi-sub">totale: ${clientiTot}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Media fattura</div>
+          <div id="dash-kpi-media" class="kpi-value">${fmtK(filtered.length ? totalF/filtered.length : 0)}</div>
+          <div class="kpi-sub">per fattura</div>
+        </div>
+      </div>
     </div>` : ''}
 
     <div class="card">
@@ -3165,7 +3165,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 23:05</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 23:12</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -3825,7 +3825,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260222-230512';
+const APP_VERSION = '20260222-231257';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
