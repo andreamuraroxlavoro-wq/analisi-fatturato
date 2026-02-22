@@ -793,7 +793,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.85);color:rgba(255,255,255,0.85)">Andrea Muraro</strong></div>
-          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 17:30</div>
+          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 17:47</div>
         </div>
       </div>
       <div class="header-actions">
@@ -1764,74 +1764,38 @@ function _downloadGDriveFile(fileId, fname, token) {
 function saveToDropbox(blob, fname) {
   const token = SETTINGS.dropbox_token;
   if (!token) { toast('Token Dropbox non configurato — vai in Impostazioni', 'error'); return; }
-
-  // Prima controlla il tipo di accesso dell'app (app folder vs full dropbox)
-  // poi carica con il path corretto
-  fetch('https://api.dropboxapi.com/2/users/get_current_account', {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-    body: 'null'
-  })
-  .then(r => r.json())
-  .then(account => {
-    if (account.error_summary) {
-      toast('Token Dropbox non valido: ' + account.error_summary, 'error');
-      return;
-    }
-    // Determina il path: se account_type è 'app_folder' usa '/', altrimenti '/AnalisiFatturatoPRO/'
-    // In pratica proviamo prima con path root (funziona con App folder)
-    // e con path pieno come fallback
-    _dropboxUpload(blob, fname, token, '/' + fname);
-  })
-  .catch(() => {
-    // Se check fallisce, prova comunque con path diretto
-    _dropboxUpload(blob, fname, token, '/' + fname);
-  });
-}
-
-function _dropboxUpload(blob, fname, token, path) {
+  // App Folder: il path è sempre /{fname} — Dropbox mette tutto in Apps/AnalisiFatturatoPRO/
+  const path = '/' + fname;
   blob.arrayBuffer().then(buf => {
     fetch('https://content.dropboxapi.com/2/files/upload', {
       method: 'POST',
       headers: {
         Authorization: 'Bearer ' + token,
         'Content-Type': 'application/octet-stream',
-        'Dropbox-API-Arg': JSON.stringify({
-          path: path,
-          mode: { '.tag': 'overwrite' },
-          autorename: false,
-          mute: false
-        })
+        'Dropbox-API-Arg': JSON.stringify({ path: path, mode: { '.tag': 'overwrite' }, autorename: false, mute: false })
       },
       body: buf
     })
-    .then(r => r.json())
+    .then(r => {
+      if (!r.ok) {
+        return r.text().then(txt => { throw new Error('HTTP ' + r.status + ': ' + txt); });
+      }
+      return r.json();
+    })
     .then(data => {
       if (data.id || data.name) {
         save(); markSaved();
         toast('\u2713 Salvato su Dropbox: ' + fname);
-      } else if (data.error_summary && data.error_summary.includes('insufficient_space')) {
-        // Riprova con path /AnalisiFatturatoPRO/ (Full Dropbox access)
-        if (!path.includes('AnalisiFatturatoPRO')) {
-          toast('\u23f3 Riprovo con percorso alternativo...');
-          _dropboxUpload(blob, fname, token, '/AnalisiFatturatoPRO/' + fname);
-        } else {
-          toast('Errore Dropbox: spazio insufficiente o permessi mancanti. Rigenera il token dopo aver impostato i permessi.', 'error');
-        }
-      } else if (data.error_summary && data.error_summary.includes('not_found')) {
-        // Cartella non trovata: crea la cartella e riprova
-        fetch('https://api.dropboxapi.com/2/files/create_folder_v2', {
-          method: 'POST',
-          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: path.substring(0, path.lastIndexOf('/')), autorename: false })
-        }).then(() => _dropboxUpload(blob, fname, token, path));
       } else {
-        const errMsg = data.error_summary || JSON.stringify(data);
-        toast('Errore Dropbox: ' + errMsg, 'error');
-        console.error('[AFP] Dropbox error detail:', data);
+        const err = data.error_summary || data['.tag'] || JSON.stringify(data);
+        toast('Errore Dropbox: ' + err, 'error');
+        console.error('[AFP] Dropbox risposta completa:', JSON.stringify(data));
       }
     })
-    .catch(e => toast('Errore rete Dropbox: ' + e.message, 'error'));
+    .catch(e => {
+      toast('Errore Dropbox: ' + e.message, 'error');
+      console.error('[AFP] Dropbox exception:', e);
+    });
   });
 }
 
@@ -2936,7 +2900,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 17:30</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 17:47</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -3596,7 +3560,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260222-173004';
+const APP_VERSION = '20260222-174740';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
