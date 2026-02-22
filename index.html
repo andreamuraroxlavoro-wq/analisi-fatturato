@@ -2114,7 +2114,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 20260222</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -2774,21 +2774,45 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-// ── Registra Service Worker (PWA offline support) ─────────────────
+// ── Service Worker con versioning automatico ──────────────────────
+const APP_VERSION = '20260222091638';
+
 (function registerSW() {
   if (!('serviceWorker' in navigator)) return;
-  // Crea SW come blob URL (funziona anche con file locali)
-  const swCode = atob('Y29uc3QgQ0FDSEUgPSAnYW5hbGlzaS1mYXR0dXJhdG8tdjEnOwpjb25zdCBPRkZMSU5FID0gWycuLyddOwoKc2VsZi5hZGRFdmVudExpc3RlbmVyKCdpbnN0YWxsJywgZSA9PiB7CiAgZS53YWl0VW50aWwoY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oYyA9PiBjLmFkZEFsbChPRkZMSU5FKSkpOwogIHNlbGYuc2tpcFdhaXRpbmcoKTsKfSk7CgpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoJ2FjdGl2YXRlJywgZSA9PiB7CiAgZS53YWl0VW50aWwoY2FjaGVzLmtleXMoKS50aGVuKGtleXMgPT4KICAgIFByb21pc2UuYWxsKGtleXMuZmlsdGVyKGsgPT4gayAhPT0gQ0FDSEUpLm1hcChrID0+IGNhY2hlcy5kZWxldGUoaykpKQogICkpOwogIHNlbGYuY2xpZW50cy5jbGFpbSgpOwp9KTsKCnNlbGYuYWRkRXZlbnRMaXN0ZW5lcignZmV0Y2gnLCBlID0+IHsKICBlLnJlc3BvbmRXaXRoKAogICAgY2FjaGVzLm1hdGNoKGUucmVxdWVzdCkudGhlbihjYWNoZWQgPT4gY2FjaGVkIHx8IGZldGNoKGUucmVxdWVzdCkuY2F0Y2goKCkgPT4gY2FjaGVzLm1hdGNoKCcuLycpKSkKICApOwp9KTs=');
+
+  const swCode = atob('Y29uc3QgQ0FDSEVfVkVSU0lPTiA9ICcyMDI2MDIyMjA5MTYzOCc7CmNvbnN0IENBQ0hFID0gJ2FuYWxpc2ktZmF0dHVyYXRvLScgKyBDQUNIRV9WRVJTSU9OOwoKc2VsZi5hZGRFdmVudExpc3RlbmVyKCdpbnN0YWxsJywgZSA9PiB7CiAgZS53YWl0VW50aWwoY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oYyA9PiBjLmFkZEFsbChbJy4vJ10pKSk7CiAgc2VsZi5za2lwV2FpdGluZygpOwp9KTsKCnNlbGYuYWRkRXZlbnRMaXN0ZW5lcignYWN0aXZhdGUnLCBlID0+IHsKICBlLndhaXRVbnRpbCgKICAgIGNhY2hlcy5rZXlzKCkudGhlbihrZXlzID0+CiAgICAgIFByb21pc2UuYWxsKGtleXMuZmlsdGVyKGsgPT4gayAhPT0gQ0FDSEUpLm1hcChrID0+IGNhY2hlcy5kZWxldGUoaykpKQogICAgKS50aGVuKCgpID0+IHNlbGYuY2xpZW50cy5jbGFpbSgpKQogICk7Cn0pOwoKc2VsZi5hZGRFdmVudExpc3RlbmVyKCdmZXRjaCcsIGUgPT4gewogIGNvbnN0IGlzSFRNTCA9IGUucmVxdWVzdC5kZXN0aW5hdGlvbiA9PT0gJ2RvY3VtZW50JzsKICBpZiAoaXNIVE1MKSB7CiAgICBlLnJlc3BvbmRXaXRoKAogICAgICBmZXRjaChlLnJlcXVlc3QpLnRoZW4ocmVzID0+IHsKICAgICAgICBjb25zdCBjbG9uZSA9IHJlcy5jbG9uZSgpOwogICAgICAgIGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGMgPT4gYy5wdXQoZS5yZXF1ZXN0LCBjbG9uZSkpOwogICAgICAgIHJldHVybiByZXM7CiAgICAgIH0pLmNhdGNoKCgpID0+IGNhY2hlcy5tYXRjaChlLnJlcXVlc3QpKQogICAgKTsKICB9IGVsc2UgewogICAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGNhY2hlZCA9PiBjYWNoZWQgfHwgZmV0Y2goZS5yZXF1ZXN0KSkpOwogIH0KfSk7CgpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoJ21lc3NhZ2UnLCBlID0+IHsKICBpZiAoZS5kYXRhID09PSAnQ0hFQ0tfVVBEQVRFJykgewogICAgZS5zb3VyY2UucG9zdE1lc3NhZ2UoeyB0eXBlOiAnU1dfVkVSU0lPTicsIHZlcnNpb246IENBQ0hFX1ZFUlNJT04gfSk7CiAgfQp9KTsK');
   const swBlob = new Blob([swCode], { type: 'application/javascript' });
   const swUrl  = URL.createObjectURL(swBlob);
+
   navigator.serviceWorker.register(swUrl, { scope: './' })
     .then(reg => {
-      console.log('[SW] Registrato:', reg.scope);
+      console.log('[SW] Attivo · build:', APP_VERSION);
+
+      // Controlla aggiornamenti quando l'app torna visibile
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update();
+      });
+
+      // Ricevi notifica dal SW se la versione è cambiata
+      navigator.serviceWorker.addEventListener('message', e => {
+        if (e.data && e.data.type === 'SW_VERSION' && e.data.version !== APP_VERSION) {
+          const t = document.createElement('div');
+          t.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1a1f2a;border:2px solid #4caf82;color:#fff;padding:14px 20px;border-radius:14px;font-size:13px;font-weight:600;z-index:99999;display:flex;align-items:center;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,0.5);white-space:nowrap';
+          t.innerHTML = '\uD83D\uDD04 Nuova versione disponibile! <button onclick="location.reload(true)" style="background:#4caf82;border:none;color:#fff;padding:6px 14px;border-radius:8px;font-weight:700;cursor:pointer;font-size:12px;font-family:sans-serif">Aggiorna ora</button>';
+          document.body.appendChild(t);
+        }
+      });
+
+      // Chiedi la versione al SW attivo
+      const askVersion = (sw) => { if (sw) sw.postMessage('CHECK_UPDATE'); };
+      askVersion(reg.active);
+      reg.addEventListener('updatefound', () => {
+        reg.installing.addEventListener('statechange', function() {
+          if (this.state === 'activated') askVersion(this);
+        });
+      });
     })
-    .catch(e => {
-      // Safari su file:// non supporta SW — nessun problema, l'app funziona lo stesso
-      console.log('[SW] Non supportato in questo contesto:', e.message);
-    });
+    .catch(e => console.log('[SW] Non supportato:', e.message));
 })();
 
 loadFromIDB(); // carica da IndexedDB (asincrono) poi chiama render()
