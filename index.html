@@ -793,7 +793,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.85);color:rgba(255,255,255,0.85)">Andrea Muraro</strong></div>
-          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 14:32</div>
+          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 17:01</div>
         </div>
       </div>
       <div class="header-actions">
@@ -1083,35 +1083,79 @@ function showSaveMethodModal() {
   el.addEventListener('click', e => { if (e.target === el) el.remove(); });
 }
 
+function _methodBigIcon(m) {
+  const icons = {
+    gdrive:
+      '<svg viewBox="0 0 87.3 78" width="52" height="52">' +
+        '<path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H1.1c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>' +
+        '<path d="M43.65 25L29.9 1.2C28.55 2 27.4 3.1 26.6 4.5L1.2 49.5C.4 50.9 0 52.45 0 54h27.5z" fill="#00ac47"/>' +
+        '<path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 11.5z" fill="#ea4335"/>' +
+        '<path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>' +
+        '<path d="M59.8 54H27.5L13.75 77.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>' +
+        '<path d="M73.4 27.5l-12.8-22.2C59.8 3.9 58.65 2.8 57.3 2L43.55 25 59.7 54h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>' +
+      '</svg>',
+    dropbox:
+      '<svg viewBox="0 0 43.1 40.5" width="52" height="52">' +
+        '<path fill="#0061ff" d="M12.8 0L0 8.2l12.8 8.2 12.8-8.2zM38.3 0L25.5 8.2l12.8 8.2 12.8-8.2z"/>' +
+        '<path fill="#0061ff" d="M0 24.7l12.8 8.2 12.8-8.2-12.8-8.2zM38.3 16.5l-12.8 8.2 12.8 8.2 12.8-8.2z"/>' +
+        '<path fill="#0061ff" d="M12.8 28.1l12.8 8.2 12.8-8.2-12.8-8.2z"/>' +
+      '</svg>',
+    onedrive:
+      '<svg viewBox="0 0 32 32" width="52" height="52">' +
+        '<path d="M19.2 12.8A7.2 7.2 0 006.4 16H6a6 6 0 000 12h20a5 5 0 000-10 4.98 4.98 0 00-1.1.12A7.2 7.2 0 0019.2 12.8z" fill="#0078d4"/>' +
+      '</svg>',
+    local:
+      '<svg viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="#e2b84a" stroke-width="1.5" stroke-linecap="round">' +
+        '<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>' +
+      '</svg>'
+  };
+  return icons[m] || '💾';
+}
+
+function _methodColor(m) {
+  return { gdrive:'#4285f4', dropbox:'#0061ff', onedrive:'#0078d4', local:'#e2b84a' }[m] || '#e2b84a';
+}
+
 function showSaveOptionsModal(method) {
-  const base   = 'DB_Analisi_Fatturato_PRO';
-  const pad    = n => String(n).padStart(3,'0');
+  const base     = 'DB_Analisi_Fatturato_PRO';
+  const pad      = n => String(n).padStart(3,'0');
   const nameOver = base + '_' + pad(SETTINGS.fileCounter || 1) + '.json';
   const nameNew  = base + '_' + pad((SETTINGS.fileCounter || 1) + 1) + '.json';
+  const col      = _methodColor(method);
+  const tot      = DB.datasets.reduce((s,ds) => s + ds.rows.length, 0);
   const el = document.createElement('div');
   el.id = 'save-opts-overlay';
-  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);z-index:99999;display:flex;align-items:flex-end;justify-content:center';
-  el.innerHTML = `
-    <div style="background:#1a1f2a;border:2px solid rgba(226,184,74,0.4);border-radius:20px 20px 0 0;padding:28px 24px 44px;width:100%;max-width:480px;animation:slideUpSheet 0.25s cubic-bezier(.2,.9,.4,1)">
-      <div style="font-size:22px;text-align:center;margin-bottom:6px">💾</div>
-      <div style="font-size:17px;font-weight:800;color:#fff;text-align:center;margin-bottom:6px">Salva Dati</div>
-      <div style="font-size:12px;color:rgba(255,255,255,0.4);text-align:center;margin-bottom:22px">
-        ${methodLabel(method)} · ${DB.datasets.length} dataset
-      </div>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <button onclick="doSaveDati('overwrite');document.getElementById('save-opts-overlay').remove()" style="width:100%;padding:14px;border-radius:14px;font-family:sans-serif;font-size:14px;font-weight:700;cursor:pointer;background:rgba(226,184,74,0.15);border:2px solid rgba(226,184,74,0.5);color:#e2b84a">
-          ♻️ Sovrascrivi file attuale
-          <div style="font-size:11px;font-weight:500;opacity:0.7;margin-top:3px">${nameOver}</div>
-        </button>
-        <button onclick="doSaveDati('new');document.getElementById('save-opts-overlay').remove()" style="width:100%;padding:14px;border-radius:14px;font-family:sans-serif;font-size:14px;font-weight:700;cursor:pointer;background:rgba(76,175,130,0.15);border:2px solid rgba(76,175,130,0.5);color:#4caf82">
-          ✨ Crea nuovo file
-          <div style="font-size:11px;font-weight:500;opacity:0.7;margin-top:3px">${nameNew}</div>
-        </button>
-        <button onclick="document.getElementById('save-opts-overlay').remove()" style="width:100%;padding:14px;border-radius:14px;font-family:sans-serif;font-size:14px;font-weight:600;cursor:pointer;background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6)">
-          Annulla
-        </button>
-      </div>
-    </div>`;
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(10px);z-index:99999;display:flex;align-items:flex-end;justify-content:center';
+  el.innerHTML =
+    '<div style="background:#141820;border:2px solid ' + col + '44;border-radius:24px 24px 0 0;padding:0;width:100%;max-width:480px;animation:slideUpSheet 0.28s cubic-bezier(.2,.9,.4,1);overflow:hidden">' +
+
+    // ── Banda colorata in cima con icona grande ──
+    '<div style="background:linear-gradient(160deg,' + col + '22,' + col + '08);padding:28px 24px 20px;text-align:center;border-bottom:1px solid ' + col + '22">' +
+    '<div style="display:inline-flex;align-items:center;justify-content:center;width:80px;height:80px;border-radius:22px;background:' + col + '18;border:2px solid ' + col + '40;margin-bottom:14px">' +
+    _methodBigIcon(method) +
+    '</div>' +
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:' + col + ';margin-bottom:4px">Salvataggio su</div>' +
+    '<div style="font-size:22px;font-weight:900;color:#fff;margin-bottom:4px">' + methodLabel(method) + '</div>' +
+    '<div style="font-size:12px;color:rgba(255,255,255,0.35)">' +
+    DB.datasets.length + ' dataset &nbsp;·&nbsp; ' + tot + ' righe' +
+    '</div>' +
+    '</div>' +
+
+    // ── Pulsanti ──
+    '<div style="padding:20px 24px 40px;display:flex;flex-direction:column;gap:10px">' +
+    '<button onclick="window._doSaveOverwrite()" style="width:100%;padding:16px 14px;border-radius:16px;font-size:14px;font-weight:700;cursor:pointer;background:rgba(226,184,74,0.12);border:2px solid rgba(226,184,74,0.45);color:#e2b84a;text-align:left;display:flex;align-items:center;gap:14px">' +
+    '<span style="font-size:26px;flex-shrink:0">♻️</span>' +
+    '<div><div style="font-size:14px;font-weight:800">Sovrascrivi file attuale</div><div style="font-size:11px;font-weight:500;opacity:0.6;margin-top:2px">' + nameOver + '</div></div>' +
+    '</button>' +
+    '<button onclick="window._doSaveNew()" style="width:100%;padding:16px 14px;border-radius:16px;font-size:14px;font-weight:700;cursor:pointer;background:rgba(76,175,130,0.12);border:2px solid rgba(76,175,130,0.45);color:#4caf82;text-align:left;display:flex;align-items:center;gap:14px">' +
+    '<span style="font-size:26px;flex-shrink:0">✨</span>' +
+    '<div><div style="font-size:14px;font-weight:800">Crea nuovo file</div><div style="font-size:11px;font-weight:500;opacity:0.6;margin-top:2px">' + nameNew + '</div></div>' +
+    '</button>' +
+    '<button onclick="window._closeSaveModal()" style="width:100%;padding:14px;border-radius:16px;font-size:14px;font-weight:600;cursor:pointer;background:rgba(255,255,255,0.05);border:2px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.45)">' +
+    'Annulla' +
+    '</button>' +
+    '</div>' +
+    '</div>';
   document.body.appendChild(el);
   el.addEventListener('click', e => { if (e.target === el) el.remove(); });
 }
@@ -1119,6 +1163,21 @@ function showSaveOptionsModal(method) {
 function methodLabel(m) {
   return { gdrive:'Google Drive', dropbox:'Dropbox', onedrive:'OneDrive', local:'Download locale' }[m] || m;
 }
+
+window._doSaveOverwrite = function() {
+  var o = document.getElementById('save-opts-overlay');
+  if (o) o.remove();
+  doSaveDati('overwrite');
+};
+window._doSaveNew = function() {
+  var o = document.getElementById('save-opts-overlay');
+  if (o) o.remove();
+  doSaveDati('new');
+};
+window._closeSaveModal = function() {
+  var o = document.getElementById('save-opts-overlay');
+  if (o) o.remove();
+};
 
 function doSaveDati(mode) {
   if (mode === 'new') {
@@ -1239,12 +1298,11 @@ function renderSavePathSection() {
     if (m === 'gdrive') {
       const hasToken = !!(SETTINGS.gdrive_token);
       return '<div style="margin-top:4px;background:rgba(255,255,255,0.04);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,0.08)">' +
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">' +
-        '<div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:1px">Token di accesso Google Drive</div>' +
-        '<button onclick="window._showGDriveGuide()" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:1.5px solid rgba(66,133,244,0.5);background:rgba(66,133,244,0.12);color:#4285f4;font-size:11px;font-weight:700;cursor:pointer">' +
-        '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>' +
-        'Come ottenere il Token</button>' +
-        '</div>' +
+        '<button onclick="window._showGDriveGuide()" style="display:flex;align-items:center;gap:10px;width:100%;padding:13px 16px;border-radius:12px;background:linear-gradient(135deg,rgba(66,133,244,0.2),rgba(66,133,244,0.1));border:2px solid rgba(66,133,244,0.55);color:#fff;cursor:pointer;margin-bottom:14px;text-align:left">' +
+        '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#4285f4" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>' +
+        '<div><div style="font-size:13px;font-weight:800;color:#fff">Come ottenere il Token per Google Drive</div>' +
+        '<div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px">Guida passo-passo · circa 3 minuti</div></div>' +
+        '</button>' +
         '<div style="display:flex;gap:8px;margin-bottom:8px">' +
         '<input id="sett-gdrive-token" type="password" placeholder="Incolla qui il token copiato da OAuth Playground..." value="' + (SETTINGS.gdrive_token || '') + '" style="flex:1;padding:10px 12px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:13px">' +
         '<button onclick="window._saveGDriveToken()" style="padding:10px 16px;border-radius:10px;background:rgba(66,133,244,0.2);border:1.5px solid rgba(66,133,244,0.5);color:#4285f4;font-weight:700;font-size:12px;cursor:pointer">Salva</button>' +
@@ -1263,11 +1321,11 @@ function renderSavePathSection() {
       ? '<svg viewBox="0 0 43.1 40.5" width="13" height="13"><path fill="#0061ff" d="M12.8 0L0 8.2l12.8 8.2 12.8-8.2zM38.3 0L25.5 8.2l12.8 8.2 12.8-8.2zM0 24.7l12.8 8.2 12.8-8.2-12.8-8.2zM38.3 16.5l-12.8 8.2 12.8 8.2 12.8-8.2zM12.8 28.1l12.8 8.2 12.8-8.2-12.8-8.2z"/></svg>'
       : '<svg viewBox="0 0 32 32" width="13" height="13"><path d="M19.2 12.8A7.2 7.2 0 006.4 16H6a6 6 0 000 12h20a5 5 0 000-10 4.98 4.98 0 00-1.1.12A7.2 7.2 0 0019.2 12.8z" fill="#0078d4"/></svg>';
     return '<div style="margin-top:4px;background:rgba(255,255,255,0.04);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,0.08)">' +
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">' +
-      '<div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:1px">Token di accesso ' + methodLabel(m) + '</div>' +
-      '<button onclick="' + guideBtn + '" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:1.5px solid ' + svcColor + '80;background:' + svcColor + '1a;color:' + svcColor + ';font-size:11px;font-weight:700;cursor:pointer">' +
-      svcIcon + ' Come ottenere il Token</button>' +
-      '</div>' +
+      '<button onclick="' + guideBtn + '" style="display:flex;align-items:center;gap:10px;width:100%;padding:13px 16px;border-radius:12px;background:linear-gradient(135deg,' + svcColor + '22,' + svcColor + '11);border:2px solid ' + svcColor + '77;color:#fff;cursor:pointer;margin-bottom:14px;text-align:left">' +
+      '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="' + svcColor + '" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>' +
+      '<div><div style="font-size:13px;font-weight:800;color:#fff">Come ottenere il Token per ' + methodLabel(m) + '</div>' +
+      '<div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px">Guida passo-passo · ' + (isDropbox ? '5 minuti' : '10 minuti') + '</div></div>' +
+      '</button>' +
       '<div style="display:flex;gap:8px;margin-bottom:8px">' +
       '<input id="sett-token-input" type="password" placeholder="Incolla qui il token..." value="' + (SETTINGS[m + '_token'] || '') + '" style="flex:1;padding:10px 12px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:13px">' +
       '<button onclick="saveCloudToken()" style="padding:10px 16px;border-radius:10px;background:rgba(226,184,74,0.2);border:1.5px solid rgba(226,184,74,0.5);color:#e2b84a;font-weight:700;font-size:12px;cursor:pointer">Salva</button>' +
@@ -1278,10 +1336,11 @@ function renderSavePathSection() {
       '</div></div>';
   })() : (m === 'local' ? (
     '<div style="margin-top:4px;background:rgba(255,255,255,0.04);border-radius:12px;padding:14px;border:1px solid rgba(255,255,255,0.08)">' +
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">' +
-    '<div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:1px">Cartella di destinazione</div>' +
-    '<button onclick="window._showLocalGuide()" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:1.5px solid rgba(226,184,74,0.5);background:rgba(226,184,74,0.12);color:#e2b84a;font-size:11px;font-weight:700;cursor:pointer"><svg viewBox=\"0 0 24 24\" width=\"12\" height=\"12\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 16v-4M12 8h.01\"/></svg> Come funziona?</button>' +
-    '</div>' +
+    '<button onclick="window._showLocalGuide()" style="display:flex;align-items:center;gap:10px;width:100%;padding:13px 16px;border-radius:12px;background:linear-gradient(135deg,rgba(226,184,74,0.18),rgba(226,184,74,0.08));border:2px solid rgba(226,184,74,0.55);color:#fff;cursor:pointer;margin-bottom:14px;text-align:left">' +
+    '<svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"#e2b84a\" stroke-width=\"2.5\" stroke-linecap=\"round\" style=\"flex-shrink:0\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 16v-4M12 8h.01\"/></svg>' +
+    '<div><div style=\"font-size:13px;font-weight:800;color:#fff\">Come funziona il salvataggio locale</div>' +
+    '<div style=\"font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px\">Guida completa · Chrome e Safari</div></div>' +
+    '</button>' +
     (_dirHandle
       ? ('<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
          '<span style="font-size:18px">📁</span>' +
@@ -1324,7 +1383,7 @@ function renderSavePathSection() {
 
   el.innerHTML =
     '<div style="padding:0 18px 18px;display:flex;flex-direction:column;gap:12px">' +
-    '<div style="font-size:12px;color:rgba(255,255,255,0.4)">Scegli dove salvare il file <strong style="color:var(--gold)">DB_Analisi_Fatturato_PRO</strong></div>' +
+    '<div style="font-size:12px;color:rgba(255,255,255,0.45);padding-top:16px;padding-bottom:4px">Scegli dove salvare il file <strong style="color:var(--gold)">DB_Analisi_Fatturato_PRO</strong></div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">' + tilesHTML + '</div>' +
     tokenHTML +
     pathBox +
@@ -2826,7 +2885,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 14:32</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 17:01</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -3486,7 +3545,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260222-143251';
+const APP_VERSION = '20260222-170126';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
