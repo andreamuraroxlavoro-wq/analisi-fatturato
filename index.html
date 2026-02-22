@@ -793,7 +793,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.85);color:rgba(255,255,255,0.85)">Andrea Muraro</strong></div>
-          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 18:22</div>
+          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 18:33</div>
         </div>
       </div>
       <div class="header-actions">
@@ -1711,6 +1711,24 @@ function loadFromGDrive() {
   .catch(e => toast('Errore rete: ' + e.message, 'error'));
 }
 
+// Helper condiviso: applica dati caricati da qualsiasi sorgente
+function _applyLoadedData(result, sourceName) {
+  if (!result || !result.datasets || !result.datasets.length) {
+    toast('File non valido o vuoto', 'error');
+    return false;
+  }
+  DB.datasets = result.datasets;
+  window._excludedClients = result.excl || [];
+  // Ricalcola dataObj per ogni riga (essenziale per filtri e grafici)
+  DB.datasets.forEach(ds => ds.rows.forEach(r => {
+    r.dataObj = (r.data && r.data.trim()) ? parseDate(r.data) : null;
+  }));
+  save(); render(); markSaved();
+  const tot = DB.datasets.reduce((s, ds) => s + ds.rows.length, 0);
+  toast('\u2713 ' + sourceName + ' caricato: ' + DB.datasets.length + ' dataset, ' + tot + ' righe');
+  return true;
+}
+
 function loadFromDropbox() {
   const token = SETTINGS.dropbox_token;
   if (!token) { toast('Token Dropbox non configurato — vai in Impostazioni', 'error'); return; }
@@ -1761,13 +1779,7 @@ function _downloadDropboxFile(path, fname, token) {
   })
   .then(r => r.text())
   .then(txt => {
-    const result = _parsePayload(txt);
-    if (!result || !result.datasets.length) { toast('File non valido o vuoto', 'error'); return; }
-    DB.datasets = result.datasets;
-    window._excludedClients = result.excl || [];
-    save(); render(); markSaved();
-    const tot = DB.datasets.reduce((s, ds) => s + ds.rows.length, 0);
-    toast('\u2713 ' + fname + ' caricato: ' + DB.datasets.length + ' dataset, ' + tot + ' righe');
+    _applyLoadedData(_parsePayload(txt), fname);
   })
   .catch(e => toast('Errore download Dropbox: ' + e.message, 'error'));
 }
@@ -1814,15 +1826,7 @@ function loadFromOneDrive() {
       headers: { Authorization: 'Bearer ' + token }
     })
     .then(r => r.text())
-    .then(txt => {
-      const result = _parsePayload(txt);
-      if (!result || !result.datasets.length) { toast('File non valido o vuoto', 'error'); return; }
-      DB.datasets = result.datasets;
-      window._excludedClients = result.excl || [];
-      save(); render(); markSaved();
-      const tot = DB.datasets.reduce((s, ds) => s + ds.rows.length, 0);
-      toast('\u2713 ' + f.name + ' caricato: ' + DB.datasets.length + ' dataset, ' + tot + ' righe');
-    });
+    .then(txt => { _applyLoadedData(_parsePayload(txt), f.name); });
   })
   .catch(e => toast('Errore rete OneDrive: ' + e.message, 'error'));
 }
@@ -1857,13 +1861,7 @@ function _downloadGDriveFile(fileId, fname, token) {
   })
   .then(r => r.json())
   .then(parsed => {
-    const result = _parsePayload(JSON.stringify(parsed));
-    if (!result || !result.datasets.length) { toast('File non valido o vuoto', 'error'); return; }
-    DB.datasets = result.datasets;
-    window._excludedClients = result.excl || [];
-    save(); render(); markSaved();
-    const tot = DB.datasets.reduce((s,ds) => s + ds.rows.length, 0);
-    toast('\u2713 ' + fname + ' caricato: ' + DB.datasets.length + ' dataset, ' + tot + ' righe');
+    _applyLoadedData(_parsePayload(JSON.stringify(parsed)), fname);
   })
   .catch(e => toast('Errore download: ' + e.message, 'error'));
 }
@@ -1996,13 +1994,7 @@ function handleSessionFile(e) {
         toast('File non valido — non \u00e8 un file Analisi Fatturato PRO', 'error');
         return;
       }
-      DB.datasets = result.datasets;
-      window._excludedClients = result.excl || [];
-      save();
-      render();
-      markSaved();
-      const tot = DB.datasets.reduce((s,ds) => s + ds.rows.length, 0);
-      toast('\u2713 Dati caricati: ' + DB.datasets.length + ' dataset, ' + tot + ' righe');
+      _applyLoadedData(result, file.name);
     } catch(err) {
       toast('Errore nel leggere il file: ' + err.message, 'error');
     }
@@ -3066,7 +3058,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 18:22</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 18:33</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -3726,7 +3718,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260222-182259';
+const APP_VERSION = '20260222-183305';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
@@ -3762,11 +3754,7 @@ renderSavePathSection();
         .then(parsed => {
           const result = _parsePayload(JSON.stringify(parsed));
           if (!result || !result.datasets.length) return;
-          DB.datasets = result.datasets;
-          window._excludedClients = result.excl || [];
-          save(); render(); markSaved();
-          const tot = DB.datasets.reduce((s, ds) => s + ds.rows.length, 0);
-          toast('\u2601\ufe0f Database caricato da Google Drive: ' + DB.datasets.length + ' dataset, ' + tot + ' righe · ' + date);
+          _applyLoadedData(result, 'Google Drive · ' + date);
         });
       })
       .catch(() => {}); // silenzioso se offline o token scaduto
