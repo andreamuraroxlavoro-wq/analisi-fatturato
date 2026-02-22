@@ -793,7 +793,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.85);color:rgba(255,255,255,0.85)">Andrea Muraro</strong></div>
-          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 22:26</div>
+          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 22:44</div>
         </div>
       </div>
       <div class="header-actions">
@@ -2461,7 +2461,7 @@ if (window._showAllClients === undefined) window._showAllClients = false;
           return '';
         })()}
       </div>
-      <div class="chart-wrap" style="${compareMode && df.anni.length >= 2 ? 'height:260px' : ''}"><canvas id="chart-monthly"></canvas></div>
+      <div id="dash-chart-wrap" class="chart-wrap" style="${compareMode && df.anni.length >= 2 ? 'height:260px' : ''}"><canvas id="chart-monthly"></canvas></div>
       ${!compareMode && df.anni.length >= 2 && !(window._dfComm||[]).length >= 2 ? '<div id="anni-legend" style="display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;justify-content:center">'
         + df.anni.map((a, idx) => {
             const c = annoColor(anniDisp, a);
@@ -2472,14 +2472,16 @@ if (window._showAllClients === undefined) window._showAllClients = false;
         + '</div>' : ''}
 
       <!-- Box media mensile sotto il grafico -->
-      ${(function(){
+      <div id="dash-media-box">${(function(){
         if (months.length < 1) return '';
         const numMesi = months.length;
         const dfC = window._dfComm || [];
+        const excl = window._excludedClients || [];
+        const filtEx = filtered.filter(r => !excl.includes(r.cliente));
 
         // Caso 1: nessun commerciale selezionato o uno solo → un box unico
         if (dfC.length <= 1) {
-          const mediaM = numMesi > 0 ? (filtered.reduce((s,r)=>s+r.importo,0) / numMesi) : 0;
+          const mediaM = numMesi > 0 ? (filtEx.reduce((s,r)=>s+r.importo,0) / numMesi) : 0;
           const label = dfC.length === 1 ? '📊 Media mensile · ' + esc(dfC[0]) : '📊 Media mensile';
           return '<div style="margin-top:16px;display:grid;grid-template-columns:1fr;gap:10px">'
             + '<div class="kpi-card" style="border-color:rgba(226,184,74,0.3);background:rgba(226,184,74,0.06)">'
@@ -2497,8 +2499,7 @@ if (window._showAllClients === undefined) window._showAllClients = false;
           + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px">'
           + dfC.map(comm => {
               const col = commColor(comms, comm);
-              // Calcola mesi distinti con fatturato per questo commerciale nel periodo filtrato
-              const commRows = filtered.filter(r => (r.commerciale||'') === comm);
+              const commRows = filtEx.filter(r => (r.commerciale||'') === comm);
               const commMonths = new Set(commRows.filter(r=>r.dataObj).map(r => r.dataObj.getFullYear()+'-'+String(r.dataObj.getMonth()+1).padStart(2,'0'))).size || 1;
               const commTotale = commRows.reduce((s,r)=>s+r.importo,0);
               const commMedia = commTotale / commMonths;
@@ -2510,7 +2511,7 @@ if (window._showAllClients === undefined) window._showAllClients = false;
             }).join('')
           + '</div>'
         + '</div>';
-      })()}
+      })()}</div>
     </div>` : ''}
 
     <div class="card">
@@ -2537,36 +2538,35 @@ if (window._showAllClients === undefined) window._showAllClients = false;
   `;
 }
 
-// Aggiorna KPI e lista clienti senza ricostruire i filtri (eseguita al toggle esclusione)
+// Aggiorna KPI, grafico e media mensile al toggle esclusione cliente
 function _updateDashExclude() {
   if (currentTab !== 'dashboard') { render(); return; }
   const rows = allRows();
   if (!rows.length) return;
 
-  // Ricalcola filtered con lo stesso stato corrente
-  const df      = window._df || { anni:[], mesi:[], quick:null };
-  const dfComm  = window._dfComm || [];
+  // Ricalcola filtered con lo stesso stato corrente dei filtri
+  const df       = window._df || { anni:[], mesi:[], quick:null };
+  const dfComm   = window._dfComm || [];
   const rowsBase = dfComm.length ? rows.filter(r => dfComm.includes(r.commerciale||'')) : rows;
   let filtered;
   if (df.quick) {
     const now  = new Date();
-    const m    = parseInt(df.quick);
-    const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const cutoff = new Date(now.getFullYear(), now.getMonth() - m, 1);
-    filtered = rowsBase.filter(r => r.dataObj && r.dataObj >= cutoff && r.dataObj < startOfCurrentMonth);
+    const cutoff = new Date(now.getFullYear(), now.getMonth() - parseInt(df.quick), 1);
+    const startOfCurr = new Date(now.getFullYear(), now.getMonth(), 1);
+    filtered = rowsBase.filter(r => r.dataObj && r.dataObj >= cutoff && r.dataObj < startOfCurr);
   } else {
     let byAnno = df.anni.length ? rowsBase.filter(r => r.dataObj && df.anni.includes(r.dataObj.getFullYear())) : rowsBase;
     filtered = df.mesi.length ? byAnno.filter(r => r.dataObj && df.mesi.includes(r.dataObj.getMonth())) : byAnno;
   }
 
-  // Applica esclusioni ai filtered per KPI
+  // Applica esclusioni
   const excl         = window._excludedClients || [];
   const filteredNoEx = filtered.filter(r => !excl.includes(r.cliente));
   const totalF       = filteredNoEx.reduce((s,r) => s + r.importo, 0);
   const clientiAtt   = new Set(filteredNoEx.map(r => r.cliente)).size;
   const clientiTot   = new Set(rows.map(r => r.cliente)).size;
 
-  // Aggiorna KPI
+  // ── KPI ─────────────────────────────────────────────────────
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
   set('dash-kpi-fatturato',     fmtK(totalF));
   set('dash-kpi-fatturato-sub', fmtEur(totalF));
@@ -2575,7 +2575,7 @@ function _updateDashExclude() {
   set('dash-kpi-clienti-sub',   'totale: ' + clientiTot);
   set('dash-kpi-media',         fmtK(filteredNoEx.length ? totalF / filteredNoEx.length : 0));
 
-  // Aggiorna lista clienti
+  // ── Lista clienti ────────────────────────────────────────────
   const listEl = document.getElementById('dash-clients-list');
   if (listEl) {
     const byClient = {};
@@ -2584,7 +2584,7 @@ function _updateDashExclude() {
     listEl.innerHTML = _buildClientsList(allClients, excl, window._showAllClients || false, filtered);
   }
 
-  // Aggiorna badge "X esclusi"
+  // ── Badge "X esclusi" ────────────────────────────────────────
   const badgeWrap = document.getElementById('dash-excl-badge');
   if (badgeWrap) {
     badgeWrap.innerHTML = excl.length
@@ -2593,42 +2593,62 @@ function _updateDashExclude() {
       : '';
   }
 
-  // Aggiorna grafico mensile
-  _refreshBarChart(filteredNoEx);
+  // ── Grafico mensile (chart-monthly) ─────────────────────────
+  _refreshMonthlyChart(filteredNoEx, filtered);
+
+  // ── Media mensile ────────────────────────────────────────────
+  _refreshMediaBox(filteredNoEx, filtered);
 }
 
-function _refreshBarChart(filteredRows) {
-  const chart = chartInstances['chart-bar'];
-  if (!chart) return;
-  const MESI = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
-  const df    = window._df || {};
-  const dfComm = window._dfComm || [];
-  const anniSel = df.anni || [];
+function _refreshMonthlyChart(filteredRows, filteredAll) {
+  // Delega a _buildMonthlyChart che gestisce tutti i casi (confronto anni, confronto comm, normale)
+  _buildMonthlyChart(filteredRows, allRows(), filteredAll || filteredRows);
+}
 
-  if (anniSel.length >= 2 && window._dfCompare) {
-    // Modalità confronto: aggiorna dataset per anno
-    anniSel.forEach((anno, i) => {
-      const ds    = chart.data.datasets[i];
-      if (!ds) return;
-      const rowsA = filteredRows.filter(r => r.dataObj && r.dataObj.getFullYear() === anno);
-      const mesi  = chart.data.labels.map(l => parseInt(l) - 1);
-      ds.data = mesi.map(m => rowsA.filter(r => r.dataObj.getMonth() === m).reduce((s,r) => s+r.importo, 0));
-    });
+function _refreshMediaBox(filteredNoEx, filteredAll) {
+  const box = document.getElementById('dash-media-box');
+  if (!box) return;
+  const MESI_SHORT = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+  const dfC   = window._dfComm || [];
+  const comms = [...new Set(allRows().map(r=>r.commerciale||'').filter(Boolean).filter(c=>c!=='—'))].sort();
+
+  // Calcola i mesi distinti presenti in filteredAll (stessa base del grafico)
+  const monthsSet = new Set(filteredAll.filter(r=>r.dataObj).map(r =>
+    r.dataObj.getFullYear() + '-' + String(r.dataObj.getMonth()+1).padStart(2,'0')
+  ));
+  const numMesi = monthsSet.size;
+  if (numMesi < 1) { box.innerHTML = ''; return; }
+
+  if (dfC.length <= 1) {
+    const mediaM = filteredNoEx.reduce((s,r) => s+r.importo, 0) / numMesi;
+    const label  = dfC.length === 1 ? '📊 Media mensile · ' + esc(dfC[0]) : '📊 Media mensile';
+    box.innerHTML = '<div style="margin-top:16px;display:grid;grid-template-columns:1fr;gap:10px">'
+      + '<div class="kpi-card" style="border-color:rgba(226,184,74,0.3);background:rgba(226,184,74,0.06)">'
+        + '<div class="kpi-label">' + label + '</div>'
+        + '<div class="kpi-value">' + fmtK(mediaM) + '</div>'
+        + '<div class="kpi-sub">' + fmtEur(mediaM) + ' · su ' + numMesi + ' mes' + (numMesi===1?'e':'i') + '</div>'
+      + '</div>'
+    + '</div>';
   } else {
-    // Modalità normale: unico dataset
-    const ds = chart.data.datasets[0];
-    if (!ds) return;
-    const monthly = {};
-    filteredRows.forEach(r => {
-      if (!r.dataObj) return;
-      const k = r.dataObj.getFullYear() + '-' + String(r.dataObj.getMonth()+1).padStart(2,'0');
-      monthly[k] = (monthly[k]||0) + r.importo;
-    });
-    const months = Object.keys(monthly).sort().slice(-24);
-    chart.data.labels   = months.map(k => { const [y,m] = k.split('-'); return MESI[parseInt(m)-1] + ' ' + y; });
-    ds.data = months.map(k => monthly[k]||0);
+    box.innerHTML = '<div style="margin-top:16px">'
+      + '<div style="font-size:10px;color:#c9a84c;text-transform:uppercase;letter-spacing:1.3px;font-weight:800;margin-bottom:8px">📊 Media mensile per commerciale in base al periodo selezionato</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px">'
+      + dfC.map(comm => {
+          const col        = commColor(comms, comm);
+          const commRows   = filteredNoEx.filter(r => (r.commerciale||'') === comm);
+          const commMonths = new Set(commRows.filter(r=>r.dataObj).map(r =>
+            r.dataObj.getFullYear()+'-'+String(r.dataObj.getMonth()+1).padStart(2,'0')
+          )).size || 1;
+          const commMedia  = commRows.reduce((s,r)=>s+r.importo,0) / commMonths;
+          return '<div class="kpi-card" style="border-color:' + col.border + '55;background:' + col.bg.replace('0.18','0.08') + '">'
+            + '<div class="kpi-label" style="color:' + col.text + ';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(comm) + '</div>'
+            + '<div class="kpi-value" style="color:' + col.text + ';font-size:18px">' + fmtK(commMedia) + '</div>'
+            + '<div class="kpi-sub">' + fmtEur(commMedia) + ' · ' + commMonths + ' mes' + (commMonths===1?'e':'i') + '</div>'
+          + '</div>';
+        }).join('')
+      + '</div>'
+    + '</div>';
   }
-  chart.update('none');
 }
 
 function afterRender() {
@@ -2636,189 +2656,42 @@ function afterRender() {
     const rows = allRows();
     if (!rows.length) return;
 
-    // Ricostruisce filtered con lo stesso stato di renderDashboard
     if (!window._df) window._df = { anni: [], mesi: [], quick: null };
-    const df = window._df;
-    const MESI = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
-
     if (!window._dfComm) window._dfComm = [];
     if (typeof window._dfComm === 'string') window._dfComm = window._dfComm ? [window._dfComm] : [];
-    const dfCommAfter = window._dfComm;
-    const rowsAfter = dfCommAfter.length ? rows.filter(r => dfCommAfter.includes(r.commerciale||'')) : rows;
+    const df      = window._df;
+    const dfComm  = window._dfComm;
+    const rowsBase = dfComm.length ? rows.filter(r => dfComm.includes(r.commerciale||'')) : rows;
 
     let filtered;
     if (df.quick) {
-      const now = new Date();
-      const m = parseInt(df.quick);
-      const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const cutoff = new Date(now.getFullYear(), now.getMonth() - m, 1);
-      filtered = rowsAfter.filter(r => r.dataObj && r.dataObj >= cutoff && r.dataObj < startOfCurrentMonth);
+      const now  = new Date();
+      const startOfCurr = new Date(now.getFullYear(), now.getMonth(), 1);
+      const cutoff = new Date(now.getFullYear(), now.getMonth() - parseInt(df.quick), 1);
+      filtered = rowsBase.filter(r => r.dataObj && r.dataObj >= cutoff && r.dataObj < startOfCurr);
     } else {
-      let byAnno = df.anni.length === 0 ? rowsAfter : rowsAfter.filter(r => r.dataObj && df.anni.includes(r.dataObj.getFullYear()));
-      filtered = df.mesi.length === 0 ? byAnno : byAnno.filter(r => r.dataObj && df.mesi.includes(r.dataObj.getMonth()));
+      let byAnno = df.anni.length ? rowsBase.filter(r => r.dataObj && df.anni.includes(r.dataObj.getFullYear())) : rowsBase;
+      filtered = df.mesi.length ? byAnno.filter(r => r.dataObj && df.mesi.includes(r.dataObj.getMonth())) : byAnno;
     }
 
-    const monthly = {};
-    filtered.forEach(r => {
-      if (!r.dataObj) return;
-      const k = r.dataObj.getFullYear() + '-' + String(r.dataObj.getMonth()+1).padStart(2,'0');
-      monthly[k] = (monthly[k] || 0) + r.importo;
-    });
-    const months = Object.keys(monthly).sort().slice(-24);
-    const monthLabels = months.map(m => { const [y,mo] = m.split('-'); return MESI[parseInt(mo)-1]+' '+y.slice(2); });
-    const monthValues = months.map(m => monthly[m]);
+    // Applica esclusioni anche al grafico già al primo render
+    const excl = window._excludedClients || [];
+    const filteredNoEx = filtered.filter(r => !excl.includes(r.cliente));
 
+    // ── Grafico mensile ────────────────────────────────────────
+    _buildMonthlyChart(filteredNoEx, rows, filtered);
+
+    // ── Grafico torta ──────────────────────────────────────────
     const byClient = {};
     filtered.forEach(r => { byClient[r.cliente] = (byClient[r.cliente]||0) + r.importo; });
     const topClients = Object.entries(byClient).sort((a,b)=>b[1]-a[1]).slice(0,20);
 
-    const mcEl = document.getElementById('chart-monthly');
-    if (mcEl && months.length > 1) {
-      const anniDisp = [...new Set(rows.filter(r=>r.dataObj).map(r=>r.dataObj.getFullYear()))].sort((a,b)=>a-b);
-      const anniAttivi = df.anni.length ? df.anni : (df.quick ? [...new Set(filtered.filter(r=>r.dataObj).map(r=>r.dataObj.getFullYear()))].sort() : anniDisp);
-      const compareAnni = window._dfCompare && anniAttivi.length >= 2 && !df.quick;
-
-      // Commerciali selezionati
-      if (!window._dfComm) window._dfComm = [];
-      if (typeof window._dfComm === 'string') window._dfComm = window._dfComm ? [window._dfComm] : [];
-      const dfComm = window._dfComm;
-      const commsDisp = [...new Set(rows.map(r=>r.commerciale||'').filter(Boolean).filter(c=>c!=='—'))].sort();
-      const compareComm = dfComm.length >= 2;
-
-      let labels, datasets, showLegend = false, compareActive = false;
-
-      if (compareComm) {
-        // ── CONFRONTO COMMERCIALI: asse X = mesi, una serie per commerciale ──
-        compareActive = true;
-        showLegend = true;
-        const mesiPresenti = [...new Set(
-          rows.filter(r => r.dataObj && dfComm.includes(r.commerciale||'')).map(r => r.dataObj.getMonth())
-        )].sort((a,b)=>a-b);
-
-        labels = mesiPresenti.map(m => MESI[m]);
-
-        datasets = dfComm.map(comm => {
-          const c = commColor(commsDisp, comm);
-          const byMese = {};
-          rows.filter(r => r.dataObj && (r.commerciale||'') === comm).forEach(r => {
-            // applica filtro anni se attivo
-            if (df.anni.length && !df.anni.includes(r.dataObj.getFullYear())) return;
-            if (df.mesi.length && !df.mesi.includes(r.dataObj.getMonth())) return;
-            const mo = r.dataObj.getMonth();
-            byMese[mo] = (byMese[mo] || 0) + r.importo;
-          });
-          return {
-            label: comm,
-            data: mesiPresenti.map(m => byMese[m] || 0),
-            backgroundColor: c.bg.replace('0.18','0.78'),
-            borderColor: c.border,
-            borderWidth: 1,
-            borderRadius: 4,
-          };
-        });
-
-      } else if (compareAnni) {
-        // ── CONFRONTO ANNI: asse X = mesi, una serie per anno ─────────────
-        compareActive = true;
-        showLegend = true;
-        const mesiPresenti = df.mesi.length
-          ? df.mesi
-          : [...new Set(filtered.filter(r=>r.dataObj).map(r=>r.dataObj.getMonth()))].sort((a,b)=>a-b);
-
-        labels = mesiPresenti.map(m => MESI[m]);
-
-        datasets = anniAttivi.map(anno => {
-          const c = annoColor(anniDisp, anno);
-          const byMese = {};
-          rows.filter(r => r.dataObj && r.dataObj.getFullYear() === anno
-            && (!dfComm.length || dfComm.includes(r.commerciale||''))
-          ).forEach(r => {
-            const mo = r.dataObj.getMonth();
-            byMese[mo] = (byMese[mo] || 0) + r.importo;
-          });
-          return {
-            label: String(anno),
-            data: mesiPresenti.map(m => byMese[m] || 0),
-            backgroundColor: c.bg.replace('0.18','0.78'),
-            borderColor: c.border,
-            borderWidth: 1,
-            borderRadius: 4,
-          };
-        });
-
-      } else {
-        // ── VISTA NORMALE (singolo commerciale o tutti) ────────────────────
-        labels = months.map(m => {
-          const [y, mo] = m.split('-');
-          return MESI[parseInt(mo)-1] + " '" + y.slice(2);
-        });
-
-        if (anniAttivi.length > 1 && !df.quick) {
-          // Un singolo dataset con colori per barra in base all'anno
-          // Così ogni etichetta è centrata esattamente sulla sua barra
-          const bgColors = months.map(mk => {
-            const anno = parseInt(mk.split('-')[0]);
-            const c = annoColor(anniDisp, anno);
-            return c.bg.replace('0.18','0.75');
-          });
-          const bdColors = months.map(mk => {
-            const anno = parseInt(mk.split('-')[0]);
-            return annoColor(anniDisp, anno).border;
-          });
-          datasets = [{
-            label: 'Fatturato',
-            data: months.map(mk => monthly[mk] || 0),
-            backgroundColor: bgColors,
-            borderColor: bdColors,
-            borderWidth: 1,
-            borderRadius: 5,
-          }];
-          // Legenda manuale: una voce per anno con il suo colore
-          showLegend = false; // la legenda sarà gestita sotto con HTML
-          window._chartAnniLegend = anniAttivi.map(a => ({ anno: a, color: annoColor(anniDisp, a).border }));
-        } else {
-          // Colora in base al commerciale unico selezionato (se presente)
-          const singleComm = dfComm.length === 1 ? dfComm[0] : null;
-          const c = singleComm
-            ? commColor(commsDisp, singleComm)
-            : (anniAttivi[0] ? annoColor(anniDisp, anniAttivi[0]) : { bg:'rgba(201,168,76,0.75)', border:'#c9a84c' });
-          datasets = [{ label: singleComm || 'Fatturato', data: monthValues, backgroundColor: c.bg.replace('0.18','0.75'), borderColor: c.border, borderWidth: 1, borderRadius: 5 }];
-        }
-      }
-
-      chartInstances['monthly'] = new Chart(mcEl, {
-        type: 'bar',
-        data: { labels, datasets },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              display: showLegend,
-              labels: { color: '#7a8099', font: { size: 11 }, boxWidth: 12, padding: 10 }
-            },
-            tooltip: {
-              callbacks: {
-                title: ctx => compareActive ? ctx[0].label : ctx[0].label,
-                label: ctx => '  ' + ctx.dataset.label + ':  ' + fmtEur(ctx.raw)
-              }
-            }
-          },
-          scales: {
-            x: { ticks: { color: '#7a8099', font: { size: 10 } }, grid: { display: false } },
-            y: { ticks: { color: '#7a8099', font: { size: 10 }, callback: v => fmtK(v) }, grid: { color: 'rgba(255,255,255,0.05)' } }
-          }
-        }
-      });
-    }
-
     const pieEl = document.getElementById('chart-pie');
     if (pieEl && topClients.length) {
-      // Esclude i clienti selezionati come "esclusi" nella Top 20
-      const excl = window._excludedClients || [];
       const pieClients = topClients.filter(([nome]) => !excl.includes(nome));
       const colors = ['#c9a84c','#4caf82','#5c9ce0','#e05c9c','#9c5ce0','#e07c3a','#3acfe0','#9ce05c','#e0c43a','#7c5ce0',
                       '#5ce0a8','#e05c5c','#5ca8e0','#c45ce0','#e0b45c','#5ce0c4','#e05ca8','#a8e05c','#5c7ce0','#e07c9c'];
+      if (chartInstances['pie']) { try { chartInstances['pie'].destroy(); } catch(e){} }
       chartInstances['pie'] = new Chart(pieEl, {
         type: 'doughnut',
         data: {
@@ -2831,6 +2704,111 @@ function afterRender() {
   }
 }
 
+// ── Funzione centrale per costruire/aggiornare il grafico mensile ──────────
+// filteredRows = righe già filtrate per periodo, commerciale ED esclusioni cliente
+// allRows_     = tutte le righe (per calcolo anni disponibili)
+// filteredAll  = righe filtrate per periodo/commerciale ma SENZA esclusioni (per mesi disponibili)
+function _buildMonthlyChart(filteredRows, allRows_, filteredAll) {
+  const mcEl = document.getElementById('chart-monthly');
+  if (!mcEl) return;
+
+  const MESI    = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+  const df      = window._df || { anni:[], mesi:[], quick:null };
+  const dfComm  = window._dfComm || [];
+  const anniDisp = [...new Set((allRows_||allRows()).filter(r=>r.dataObj).map(r=>r.dataObj.getFullYear()))].sort((a,b)=>a-b);
+  const baseFilt = filteredAll || filteredRows;
+  const anniAttivi = df.anni.length ? df.anni
+    : (df.quick ? [...new Set(baseFilt.filter(r=>r.dataObj).map(r=>r.dataObj.getFullYear()))].sort()
+                : anniDisp);
+  const commsDisp   = [...new Set((allRows_||allRows()).map(r=>r.commerciale||'').filter(Boolean).filter(c=>c!=='—'))].sort();
+  const compareAnni = window._dfCompare && anniAttivi.length >= 2 && !df.quick;
+  const compareComm = dfComm.length >= 2;
+
+  // Calcola monthly dai filteredRows (con esclusioni applicate)
+  const monthly = {};
+  filteredRows.forEach(r => {
+    if (!r.dataObj) return;
+    const k = r.dataObj.getFullYear() + '-' + String(r.dataObj.getMonth()+1).padStart(2,'0');
+    monthly[k] = (monthly[k]||0) + r.importo;
+  });
+  const months     = Object.keys(monthly).sort().slice(-24);
+  const monthValues = months.map(k => monthly[k]||0);
+
+  let labels, datasets, showLegend = false, compareActive = false;
+
+  if (compareComm) {
+    compareActive = true; showLegend = true;
+    const mesiPresenti = [...new Set(
+      (allRows_||allRows()).filter(r => r.dataObj && dfComm.includes(r.commerciale||'')).map(r => r.dataObj.getMonth())
+    )].sort((a,b)=>a-b);
+    labels = mesiPresenti.map(m => MESI[m]);
+    datasets = dfComm.map(comm => {
+      const c = commColor(commsDisp, comm);
+      const byMese = {};
+      filteredRows.filter(r => r.dataObj && (r.commerciale||'') === comm).forEach(r => {
+        const mo = r.dataObj.getMonth();
+        byMese[mo] = (byMese[mo]||0) + r.importo;
+      });
+      return { label: comm, data: mesiPresenti.map(m => byMese[m]||0),
+               backgroundColor: c.bg.replace('0.18','0.78'), borderColor: c.border, borderWidth: 1, borderRadius: 4 };
+    });
+
+  } else if (compareAnni) {
+    compareActive = true; showLegend = true;
+    const mesiPresenti = df.mesi.length
+      ? df.mesi
+      : [...new Set(baseFilt.filter(r=>r.dataObj).map(r=>r.dataObj.getMonth()))].sort((a,b)=>a-b);
+    labels = mesiPresenti.map(m => MESI[m]);
+    datasets = anniAttivi.map(anno => {
+      const c = annoColor(anniDisp, anno);
+      const byMese = {};
+      filteredRows.filter(r => r.dataObj && r.dataObj.getFullYear() === anno).forEach(r => {
+        const mo = r.dataObj.getMonth();
+        byMese[mo] = (byMese[mo]||0) + r.importo;
+      });
+      return { label: String(anno), data: mesiPresenti.map(m => byMese[m]||0),
+               backgroundColor: c.bg.replace('0.18','0.78'), borderColor: c.border, borderWidth: 1, borderRadius: 4 };
+    });
+
+  } else {
+    labels = months.map(m => { const [y,mo] = m.split('-'); return MESI[parseInt(mo)-1]+" '"+y.slice(2); });
+    if (anniAttivi.length > 1 && !df.quick) {
+      const bgColors = months.map(mk => annoColor(anniDisp, parseInt(mk.split('-')[0])).bg.replace('0.18','0.75'));
+      const bdColors = months.map(mk => annoColor(anniDisp, parseInt(mk.split('-')[0])).border);
+      datasets = [{ label: 'Fatturato', data: monthValues, backgroundColor: bgColors, borderColor: bdColors, borderWidth: 1, borderRadius: 5 }];
+      showLegend = false;
+      window._chartAnniLegend = anniAttivi.map(a => ({ anno: a, color: annoColor(anniDisp, a).border }));
+    } else {
+      const singleComm = dfComm.length === 1 ? dfComm[0] : null;
+      const c = singleComm
+        ? commColor(commsDisp, singleComm)
+        : (anniAttivi[0] ? annoColor(anniDisp, anniAttivi[0]) : { bg:'rgba(201,168,76,0.75)', border:'#c9a84c' });
+      datasets = [{ label: singleComm||'Fatturato', data: monthValues,
+                    backgroundColor: c.bg.replace('0.18','0.75'), borderColor: c.border, borderWidth: 1, borderRadius: 5 }];
+    }
+  }
+
+  if (months.length < 2 && !compareComm && !compareAnni) return;
+
+  // Distruggi il vecchio e ricrea (garantisce label + scale corretti)
+  if (chartInstances['monthly']) { try { chartInstances['monthly'].destroy(); } catch(e){} delete chartInstances['monthly']; }
+
+  chartInstances['monthly'] = new Chart(mcEl, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: showLegend, labels: { color: '#7a8099', font: { size: 11 }, boxWidth: 12, padding: 10 } },
+        tooltip: { callbacks: { title: ctx => ctx[0].label, label: ctx => '  ' + ctx.dataset.label + ':  ' + fmtEur(ctx.raw) } }
+      },
+      scales: {
+        x: { ticks: { color: '#7a8099', font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { color: '#7a8099', font: { size: 10 }, callback: v => fmtK(v) }, grid: { color: 'rgba(255,255,255,0.05)' } }
+      }
+    }
+  });
+}
 
 // ============================================================
 // CLIENTI TAB
@@ -3173,7 +3151,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 22:26</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 22:44</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -3833,7 +3811,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260222-222659';
+const APP_VERSION = '20260222-224415';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
