@@ -2059,7 +2059,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · 20260222-095333</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -2726,18 +2726,20 @@ loadFromIDB(); // carica da localStorage e mostra i dati
 // Popola badge versione nell'header
 (function() {
   const el = document.getElementById('header-version');
-  if (!el) return;
   const v = APP_VERSION; // formato: YYYYMMDD-HHMMSS
   const parts = v.split('-');
+  let verLabel = 'v ' + v;
   if (parts.length === 2) {
     const d = parts[0];
     const t = parts[1];
     const data = d.slice(0,4) + '.' + d.slice(4,6) + '.' + d.slice(6,8);
     const ora  = t.slice(0,2) + ':' + t.slice(2,4);
-    el.textContent = 'v ' + data + ' - ' + ora;
-  } else {
-    el.textContent = 'v ' + v;
+    verLabel = 'v ' + data + ' - ' + ora;
   }
+  if (el) el.textContent = verLabel;
+  // Aggiorna anche il label nella sezione Impostazioni
+  const sv = document.getElementById('settings-version');
+  if (sv) sv.textContent = 'Versione 2.0 · build ' + verLabel;
 })();
 
 // Mostra banner installazione iOS se non già installata
