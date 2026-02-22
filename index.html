@@ -50,7 +50,7 @@
   /* HEADER */
   header {
     background: var(--surface);
-    padding: 52px 20px 16px;
+    padding: 46px 20px 14px;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
   }
@@ -62,7 +62,7 @@
     gap: 12px;
   }
   .app-logo-wrap {
-    display: flex; align-items: center; gap: 11px;
+    display: flex; align-items: center; gap: 14px;
     min-width: 0; flex-shrink: 1;
   }
   /* Responsive: su schermi molto stretti i pulsanti vanno sotto */
@@ -84,47 +84,60 @@
     }
   }
   .app-icon {
-    width: 84px; height: 84px; border-radius: 20px; flex-shrink: 0;
-    background: linear-gradient(135deg, #e2b84a 0%, #c9853a 55%, #a05c20 100%);
+    width: 62px; height: 62px; border-radius: 16px; flex-shrink: 0;
+    background: linear-gradient(145deg, #f0c456 0%, #d4902e 50%, #a05c18 100%);
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 6px 24px rgba(226,184,74,0.55), inset 0 1px 0 rgba(255,255,255,0.25);
+    box-shadow: 0 4px 18px rgba(226,184,74,0.50), inset 0 1px 0 rgba(255,255,255,0.22);
     position: relative; overflow: hidden;
   }
   .app-icon::before {
     content: '';
-    position: absolute; top: -10px; left: -10px;
-    width: 40px; height: 40px;
-    background: rgba(255,255,255,0.15);
+    position: absolute; top: -8px; left: -8px;
+    width: 30px; height: 30px;
+    background: rgba(255,255,255,0.13);
     border-radius: 50%;
   }
   .app-title-block {
     min-width: 0;
-    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
   .app-title {
     font-family: 'Nunito', sans-serif;
-    font-size: 38px;
+    font-size: 28px;
     font-weight: 900;
-    letter-spacing: -0.5px;
-    line-height: 1;
-    background: linear-gradient(90deg, #f5d080 0%, #e2b84a 45%, #ff9f2e 100%);
+    letter-spacing: -0.3px;
+    line-height: 1.05;
+    background: linear-gradient(90deg, #f5d080 0%, #e2b84a 50%, #ff9f2e 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
   .app-title .title-pro {
-    font-size: 22px;
+    font-size: 15px;
     font-weight: 900;
-    letter-spacing: 3px;
-    background: linear-gradient(90deg, #ffffff 0%, #e2b84a 100%);
+    letter-spacing: 2.5px;
+    background: linear-gradient(90deg, #ffffff 0%, #ddd 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
     vertical-align: middle;
-    margin-left: 5px;
+    margin-left: 6px;
     text-transform: uppercase;
   }
-  .header-subtitle { font-size: 11px; color: var(--text-muted); margin-top: 5px; letter-spacing: 0.3px; }
+  .header-subtitle { font-size: 11px; color: var(--text-muted); margin-top: 1px; letter-spacing: 0.2px; }
+  #header-version {
+    display: inline-flex; align-items: center;
+    font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.55);
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    padding: 2px 10px;
+    margin-top: 4px;
+    width: fit-content;
+    letter-spacing: 0.3px;
+  }
   #import-btn {
     background: var(--gold);
     color: #0d0f14;
@@ -782,18 +795,18 @@
       <div class="app-logo-wrap">
         <!-- Icona App -->
         <div class="app-icon">
-          <svg width="44" height="44" viewBox="0 0 24 24" fill="none">
-            <path d="M3 3h18v4H3z" fill="rgba(255,255,255,0.9)" rx="1"/>
-            <path d="M3 9h11v3H3z" fill="rgba(255,255,255,0.7)"/>
-            <path d="M3 14h7v3H3z" fill="rgba(255,255,255,0.5)"/>
-            <path d="M17 12l4 4-4 4" stroke="rgba(255,255,255,0.95)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M21 16h-6" stroke="rgba(255,255,255,0.95)" stroke-width="2.2" stroke-linecap="round"/>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="3" width="18" height="3.5" rx="1" fill="rgba(255,255,255,0.92)"/>
+            <rect x="3" y="8.5" width="12" height="3" rx="1" fill="rgba(255,255,255,0.72)"/>
+            <rect x="3" y="13.5" width="8" height="3" rx="1" fill="rgba(255,255,255,0.52)"/>
+            <path d="M17 13l3.5 3.5L17 20" stroke="rgba(255,255,255,0.95)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <line x1="20.5" y1="16.5" x2="14" y2="16.5" stroke="rgba(255,255,255,0.95)" stroke-width="2" stroke-linecap="round"/>
           </svg>
         </div>
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
-          <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.85);color:rgba(255,255,255,0.85)">Andrea Muraro</strong></div>
-          <div id="header-version">v 2026.02.22 - 22:53</div>
+          <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.82);color:rgba(255,255,255,0.82);font-weight:700">Andrea Muraro</strong></div>
+          <div id="header-version">v 2026.02.22 - 23:05</div>
         </div>
       </div>
       <div class="header-actions">
@@ -2199,7 +2212,7 @@ function _buildClientsList(allClients, excl, showAll, filteredRows) {
     const barColor    = isExcl ? 'rgba(224,92,92,0.35)' : (isExtra ? 'rgba(116,185,255,0.6)' : 'var(--gold)');
     const exclTag     = isExcl
       ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#e05c5c;background:rgba(224,92,92,0.15);border:1px solid rgba(224,92,92,0.4);border-radius:20px;padding:2px 8px;flex-shrink:0;margin-left:4px">✕ escluso</span>'
-      : (isSub ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#4caf82;background:rgba(76,175,130,0.12);border:1px solid rgba(76,175,130,0.35);border-radius:20px;padding:2px 8px;flex-shrink:0;margin-left:4px">↑ nuovo</span>' : '');
+      : '';
     const hoverBg     = isExcl ? 'rgba(224,92,92,0.18)' : 'rgba(255,255,255,0.05)';
     const leaveBg     = isExcl ? 'rgba(224,92,92,0.12)' : (isExtra ? 'rgba(116,185,255,0.04)' : 'transparent');
 
@@ -3152,7 +3165,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 22:53</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 23:05</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -3812,7 +3825,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260222-225330';
+const APP_VERSION = '20260222-230512';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
