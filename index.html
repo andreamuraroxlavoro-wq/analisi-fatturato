@@ -793,7 +793,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.85);color:rgba(255,255,255,0.85)">Andrea Muraro</strong></div>
-          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 13:42</div>
+          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 13:53</div>
         </div>
       </div>
       <div class="header-actions">
@@ -1237,25 +1237,18 @@ function renderSavePathSection() {
   const isChrome = !!(window.chrome) || ('showDirectoryPicker' in window);
   const tokenHTML = (m && m !== 'local') ? (() => {
     if (m === 'gdrive') {
-      const connected = _gdriveTokenValid();
-      const expiry    = SETTINGS.gdrive_expiry ? new Date(SETTINGS.gdrive_expiry).toLocaleTimeString('it-IT', {hour:'2-digit',minute:'2-digit'}) : '';
+      const hasToken = !!(SETTINGS.gdrive_token);
       return '<div style="margin-top:4px;background:rgba(255,255,255,0.04);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,0.08)">' +
-        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">' +
-        '<div style="width:36px;height:36px;border-radius:10px;background:rgba(66,133,244,0.15);display:flex;align-items:center;justify-content:center">' +
-        '<svg viewBox="0 0 87.3 78" width="20" height="20"><path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H1.1c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="M43.65 25L29.9 1.2C28.55 2 27.4 3.1 26.6 4.5L1.2 49.5C.4 50.9 0 52.45 0 54h27.5z" fill="#00ac47"/><path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 11.5z" fill="#ea4335"/><path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="M59.8 54H27.5L13.75 77.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="M73.4 27.5l-12.8-22.2C59.8 3.9 58.65 2.8 57.3 2L43.55 25 59.7 54h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>' +
+        '<div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Token di accesso Google Drive</div>' +
+        '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:10px">Vai su <a href=\"https://developers.google.com/oauthplayground\" target=\"_blank\" style=\"color:#4285f4\">OAuth Playground</a>, seleziona lo scope <strong style=\"color:#fff\">Drive API v3 → drive.file</strong>, autorizza e copia il token qui sotto.</div>' +
+        '<div style="display:flex;gap:8px;margin-bottom:8px">' +
+        '<input id="sett-gdrive-token" type="password" placeholder="Incolla il token..." value="' + (SETTINGS.gdrive_token || '') + '" style="flex:1;padding:10px 12px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:13px">' +
+        '<button onclick="window._saveGDriveToken()" style="padding:10px 16px;border-radius:10px;background:rgba(66,133,244,0.2);border:1.5px solid rgba(66,133,244,0.5);color:#4285f4;font-weight:700;font-size:12px;cursor:pointer">Salva</button>' +
         '</div>' +
-        '<div>' +
-        '<div style="font-size:13px;font-weight:700;color:#fff">Google Drive</div>' +
-        '<div style="font-size:11px;color:' + (connected ? '#4caf82' : 'rgba(255,255,255,0.4)') + '">' +
-        (connected ? ('✓ Connesso · token valido fino alle ' + expiry) : '✗ Non connesso') +
-        '</div></div></div>' +
-        (connected
-          ? ('<div style="display:flex;gap:8px">' +
-             '<button onclick="connectGDrive()" style="flex:1;padding:11px;border-radius:10px;background:rgba(66,133,244,0.12);border:1.5px solid rgba(66,133,244,0.4);color:#4285f4;font-weight:700;font-size:12px;cursor:pointer">🔄 Rinnova token</button>' +
-             '<button onclick="disconnectGDrive()" style="padding:11px 14px;border-radius:10px;background:rgba(255,71,87,0.1);border:1.5px solid rgba(255,71,87,0.3);color:#ff4757;font-weight:700;font-size:12px;cursor:pointer">Disconnetti</button>' +
-             '</div>')
-          : '<button onclick="connectGDrive()" style="width:100%;padding:13px;border-radius:10px;background:linear-gradient(135deg,rgba(66,133,244,0.25),rgba(66,133,244,0.15));border:2px solid rgba(66,133,244,0.6);color:#4285f4;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>Connetti Google Drive</button>') +
-        '</div>';
+        '<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:' + (hasToken ? '#4caf82' : 'rgba(255,255,255,0.3)') + '">' +
+        '<span style="width:6px;height:6px;border-radius:50%;background:' + (hasToken ? '#4caf82' : 'rgba(255,255,255,0.2)') + '"></span>' +
+        (hasToken ? 'Token presente — premi Salva Dati per verificare' : 'Nessun token inserito') +
+        '</div></div>';
     }
     // Dropbox e OneDrive: token manuale (per ora)
     return '<div style="margin-top:4px;background:rgba(255,255,255,0.04);border-radius:12px;padding:14px;border:1px solid rgba(255,255,255,0.08)">' +
@@ -1292,11 +1285,23 @@ function renderSavePathSection() {
     '</div>'
   ) : '');
 
-  // Stato
+  // Stato + percorso file locale
   const dot   = m ? '#4caf82' : '#ff4757';
+  let pathBox = '';
+  if (m === 'local') {
+    const folderName = _dirHandle ? _dirHandle.name : (SETTINGS.localFolderName || '');
+    const fullPath   = folderName ? folderName + '/' + fname : fname;
+    pathBox = '<div style="margin-top:8px;background:rgba(0,0,0,0.3);border:1.5px solid rgba(226,184,74,0.3);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px">' +
+      '<span style="font-size:16px;flex-shrink:0">📁</span>' +
+      '<div style="flex:1;min-width:0">' +
+      '<div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:3px">Percorso file</div>' +
+      '<div style="font-size:12px;font-weight:700;color:#e2b84a;word-break:break-all;font-family:monospace">' + fullPath + '</div>' +
+      (folderName ? '<div style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:2px">Cartella: ' + folderName + '</div>' : '<div style="font-size:10px;color:rgba(255,71,87,0.7);margin-top:2px">Cartella non selezionata — selezionala sopra (Chrome) o il file andrà in Download</div>') +
+      '</div></div>';
+  }
   const stato = m
     ? ('Metodo: <strong style="color:rgba(255,255,255,0.8)">' + methodLabel(m) + '</strong>'
-       + (counter > 1 ? ' &nbsp;·&nbsp; File: <strong style="color:#e2b84a">' + fname + '</strong>' : ''))
+       + ' &nbsp;·&nbsp; File: <strong style="color:#e2b84a">' + fname + '</strong>')
     : 'Nessun metodo — i dati non vengono salvati su file';
 
   el.innerHTML =
@@ -1304,6 +1309,7 @@ function renderSavePathSection() {
     '<div style="font-size:12px;color:rgba(255,255,255,0.4)">Scegli dove salvare il file <strong style="color:var(--gold)">DB_Analisi_Fatturato_PRO</strong></div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">' + tilesHTML + '</div>' +
     tokenHTML +
+    pathBox +
     '<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(255,255,255,0.4)">' +
     '<span style="width:8px;height:8px;border-radius:50%;background:' + dot + ';flex-shrink:0"></span>' +
     stato + '</div>' +
@@ -1319,151 +1325,19 @@ function saveCloudToken() {
   toast('\u2713 Token salvato');
 }
 
-// ── Google Drive OAuth2 ──────────────────────────────────────────────────
-const GDRIVE_CLIENT_ID = '817077810257-p66ufgge93l79ql4acjdejgb8ecgnc4c.apps.googleusercontent.com';
-const GDRIVE_SCOPE     = 'https://www.googleapis.com/auth/drive.file';
-
-function connectGDrive() {
-  // Apre popup OAuth Google
-  const redirectUri = window.location.origin + window.location.pathname;
-  const url = 'https://accounts.google.com/o/oauth2/v2/auth' +
-    '?client_id='    + encodeURIComponent(GDRIVE_CLIENT_ID) +
-    '&redirect_uri=' + encodeURIComponent(redirectUri) +
-    '&response_type=token' +
-    '&scope='        + encodeURIComponent(GDRIVE_SCOPE) +
-    '&prompt=select_account';
-
-  const popup = window.open(url, 'gdrive_oauth',
-    'width=500,height=650,top=' + Math.round((screen.height-650)/2) +
-    ',left=' + Math.round((screen.width-500)/2));
-
-  // Ascolta il redirect con il token
-  const timer = setInterval(() => {
-    try {
-      const pu = popup.location.href;
-      if (pu.includes('access_token=')) {
-        clearInterval(timer);
-        popup.close();
-        const params = new URLSearchParams(pu.split('#')[1] || pu.split('?')[1]);
-        const token  = params.get('access_token');
-        const expin  = parseInt(params.get('expires_in') || '3600');
-        if (token) {
-          SETTINGS.gdrive_token    = token;
-          SETTINGS.gdrive_expiry   = Date.now() + expin * 1000;
-          saveSettings();
-          renderSavePathSection();
-          toast('\u2713 Google Drive connesso! Token valido per ' + Math.round(expin/60) + ' minuti');
-        }
-      }
-    } catch(e) { /* cross-origin, aspetta */ }
-    if (!popup || popup.closed) clearInterval(timer);
-  }, 500);
-}
-
-function loadFromGDrive() {
-  if (!_gdriveTokenValid()) {
-    _showReconnectModal('Google Drive', connectGDrive, () => {
-      setTimeout(loadFromGDrive, 2000);
-    });
-    return;
-  }
-  const token = SETTINGS.gdrive_token;
-  const pad   = n => String(n).padStart(3,'0');
-  // Cerca tutti i file DB_Analisi_Fatturato_PRO_*.json su Drive
-  fetch("https://www.googleapis.com/drive/v3/files?q=name+contains+'DB_Analisi_Fatturato_PRO'&orderBy=modifiedTime+desc&fields=files(id,name,modifiedTime)", {
-    headers: { Authorization: 'Bearer ' + token }
-  })
-  .then(r => r.json())
-  .then(data => {
-    if (!data.files || data.files.length === 0) {
-      toast('Nessun file trovato su Google Drive', 'error');
-      return;
-    }
-    if (data.files.length === 1) {
-      // Un solo file: carica direttamente
-      _downloadGDriveFile(data.files[0].id, data.files[0].name, token);
-      return;
-    }
-    // Più file: mostra dialogo di scelta
-    _showGDrivePickModal(data.files, token);
-  })
-  .catch(e => toast('Errore ricerca Google Drive: ' + e.message, 'error'));
-}
-
-window._pickGDrive = function(btn) {
-  var overlay = document.getElementById('gdrive-pick-overlay');
-  if (overlay) overlay.remove();
-  var fileId = btn.getAttribute('data-id');
-  var fname  = btn.getAttribute('data-name');
-  _downloadGDriveFile(fileId, fname, SETTINGS.gdrive_token);
-};
-
-function _showGDrivePickModal(files, token) {
-  const el = document.createElement('div');
-  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:99999;display:flex;align-items:flex-end;justify-content:center';
-  const fileRows = files.map(f => {
-    const date = new Date(f.modifiedTime).toLocaleDateString('it-IT', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-    return '<button onclick="window._pickGDrive(this)" data-id="' + f.id + '" data-name="' + f.name + '" style="width:100%;padding:14px 16px;border-radius:12px;background:rgba(255,255,255,0.05);border:1.5px solid rgba(255,255,255,0.1);color:#fff;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center">' +
-      '<div style="font-size:13px;font-weight:700">' + f.name + '</div>' +
-      '<div style="font-size:11px;color:rgba(255,255,255,0.4)">' + date + '</div>' +
-      '</button>';
-  }).join('');
-  el.id = 'gdrive-pick-overlay';
-  el.innerHTML = '<div style="background:#1a1f2a;border:2px solid rgba(226,184,74,0.4);border-radius:20px 20px 0 0;padding:28px 24px 44px;width:100%;max-width:480px;max-height:80vh;overflow-y:auto">' +
-    '<div style="font-size:17px;font-weight:800;color:#fff;margin-bottom:6px">📂 Scegli file da caricare</div>' +
-    '<div style="font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:18px">File trovati su Google Drive</div>' +
-    '<div style="display:flex;flex-direction:column;gap:8px">' + fileRows + '</div>' +
-    '<button onclick="var o=document.getElementById(\'gdrive-pick-overlay\');if(o)o.remove()" style="width:100%;margin-top:12px;padding:13px;border-radius:14px;background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.5);font-size:13px;font-weight:600;cursor:pointer">Annulla</button>' +
-    '</div>';
-  document.body.appendChild(el);
-  el.addEventListener('click', e => { if (e.target === el) el.remove(); });
-}
-
-function _downloadGDriveFile(fileId, fname, token) {
-  toast('⏳ Caricamento ' + fname + ' da Google Drive...');
-  fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', {
-    headers: { Authorization: 'Bearer ' + token }
-  })
-  .then(r => r.json())
-  .then(parsed => {
-    const result = _parsePayload(JSON.stringify(parsed));
-    if (!result || !result.datasets.length) {
-      toast('File non valido o vuoto', 'error');
-      return;
-    }
-    DB.datasets = result.datasets;
-    window._excludedClients = result.excl || [];
-    save();
-    render();
-    markSaved();
-    const tot = DB.datasets.reduce((s,ds) => s + ds.rows.length, 0);
-    toast('\u2713 ' + fname + ' caricato: ' + DB.datasets.length + ' dataset, ' + tot + ' righe');
-  })
-  .catch(e => toast('Errore download Google Drive: ' + e.message, 'error'));
-}
-
-function disconnectGDrive() {
-  SETTINGS.gdrive_token  = '';
-  SETTINGS.gdrive_expiry = 0;
+window._saveGDriveToken = function() {
+  var inp = document.getElementById('sett-gdrive-token');
+  if (!inp) return;
+  SETTINGS.gdrive_token = inp.value.trim();
   saveSettings();
   renderSavePathSection();
-  toast('Google Drive disconnesso');
-}
+  toast('\u2713 Token Google Drive salvato');
+};
 
-function _gdriveTokenValid() {
-  return SETTINGS.gdrive_token && (!SETTINGS.gdrive_expiry || Date.now() < SETTINGS.gdrive_expiry);
-}
-
+// ── Google Drive (token manuale) ────────────────────────────────────────
 function saveToGDrive(blob, fname) {
-  if (!_gdriveTokenValid()) {
-    // Token scaduto: mostra dialogo riconnessione
-    _showReconnectModal('Google Drive', connectGDrive, () => {
-      setTimeout(() => saveToGDrive(blob, fname), 2000);
-    });
-    return;
-  }
   const token = SETTINGS.gdrive_token;
-  // Usa multipart upload per creare/aggiornare il file
+  if (!token) { toast('Token Google Drive non configurato — vai in Impostazioni', 'error'); return; }
   blob.arrayBuffer().then(buf => {
     const boundary = 'afp_boundary_' + Date.now();
     const meta     = JSON.stringify({ name: fname, mimeType: 'application/json' });
@@ -1476,13 +1350,9 @@ function saveToGDrive(blob, fname) {
     combined.set(preBuf, 0);
     combined.set(new Uint8Array(buf), preBuf.length);
     combined.set(postBuf, preBuf.length + buf.byteLength);
-
     return fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
       method:  'POST',
-      headers: {
-        Authorization: 'Bearer ' + token,
-        'Content-Type': 'multipart/related; boundary=' + boundary
-      },
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'multipart/related; boundary=' + boundary },
       body: combined
     });
   })
@@ -1493,9 +1363,8 @@ function saveToGDrive(blob, fname) {
       toast('\u2713 Salvato su Google Drive: ' + fname);
     } else if (data.error && data.error.code === 401) {
       SETTINGS.gdrive_token = '';
-      saveSettings();
-      renderSavePathSection();
-      toast('Token Google Drive scaduto — riconnettiti', 'error');
+      saveSettings(); renderSavePathSection();
+      toast('Token Google Drive scaduto o non valido — aggiornalo in Impostazioni', 'error');
     } else {
       toast('Errore Google Drive: ' + (data.error && data.error.message || JSON.stringify(data)), 'error');
     }
@@ -1503,23 +1372,65 @@ function saveToGDrive(blob, fname) {
   .catch(e => toast('Errore rete: ' + e.message, 'error'));
 }
 
-function _showReconnectModal(service, connectFn, afterFn) {
+function loadFromGDrive() {
+  const token = SETTINGS.gdrive_token;
+  if (!token) { toast('Token Google Drive non configurato — vai in Impostazioni', 'error'); return; }
+  toast('\u23f3 Ricerca file su Google Drive...');
+  fetch("https://www.googleapis.com/drive/v3/files?q=name+contains+'DB_Analisi_Fatturato_PRO'&orderBy=modifiedTime+desc&fields=files(id,name,modifiedTime)", {
+    headers: { Authorization: 'Bearer ' + token }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) { toast('Errore Google Drive: ' + data.error.message, 'error'); return; }
+    if (!data.files || data.files.length === 0) { toast('Nessun file trovato su Google Drive', 'error'); return; }
+    if (data.files.length === 1) {
+      _downloadGDriveFile(data.files[0].id, data.files[0].name, token);
+    } else {
+      _showGDrivePickModal(data.files, token);
+    }
+  })
+  .catch(e => toast('Errore rete: ' + e.message, 'error'));
+}
+
+window._closeGDrivePick = function() {
+  var o = document.getElementById('gdrive-pick-overlay');
+  if (o) o.remove();
+};
+window._pickGDrive = function(btn) {
+  var overlay = document.getElementById('gdrive-pick-overlay');
+  if (overlay) overlay.remove();
+  _downloadGDriveFile(btn.getAttribute('data-id'), btn.getAttribute('data-name'), SETTINGS.gdrive_token);
+};
+
+function _showGDrivePickModal(files, token) {
   const el = document.createElement('div');
-  el.className = 'reconnect-modal'; el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
-  el.innerHTML = '<div style="background:#1a1f2a;border:2px solid rgba(226,184,74,0.4);border-radius:20px;padding:28px 24px;width:100%;max-width:380px;text-align:center">' +
-    '<div style="font-size:32px;margin-bottom:12px">🔄</div>' +
-    '<div style="font-size:17px;font-weight:800;color:#fff;margin-bottom:8px">Token ' + service + ' scaduto</div>' +
-    '<div style="font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:22px">Il token di accesso è scaduto. Riconnetti l&#39;account per continuare.</div>' +
-    '<div style="display:flex;flex-direction:column;gap:10px">' +
-    '<button id="_reconnect_btn" style="padding:14px;border-radius:14px;background:linear-gradient(135deg,#e2b84a,#c9853a);border:none;color:#000;font-weight:700;font-size:14px;cursor:pointer">Riconnetti ' + service + '</button>' +
-    '<button onclick="this.closest(".reconnect-modal").remove()" style="padding:14px;border-radius:14px;background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.5);font-size:14px;cursor:pointer">Annulla</button>' +
-    '</div></div>';
+  el.id = 'gdrive-pick-overlay';
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:99999;display:flex;align-items:flex-end;justify-content:center';
+  const rows = files.map(f => {
+    const date = new Date(f.modifiedTime).toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    return '<button onclick="window._pickGDrive(this)" data-id="' + f.id + '" data-name="' + f.name + '" style="width:100%;padding:14px;border-radius:12px;background:rgba(255,255,255,0.05);border:1.5px solid rgba(255,255,255,0.1);color:#fff;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;font-weight:700">' + f.name + '</span><span style="font-size:11px;color:rgba(255,255,255,0.4)">' + date + '</span></button>';
+  }).join('');
+  el.innerHTML = '<div style="background:#1a1f2a;border:2px solid rgba(226,184,74,0.4);border-radius:20px 20px 0 0;padding:28px 24px 44px;width:100%;max-width:480px;max-height:80vh;overflow-y:auto"><div style="font-size:17px;font-weight:800;color:#fff;margin-bottom:6px">📂 Scegli file da caricare</div><div style="font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:18px">File trovati su Google Drive — dal più recente</div><div style="display:flex;flex-direction:column;gap:8px">' + rows + '</div><button onclick="window._closeGDrivePick()" style="width:100%;margin-top:12px;padding:13px;border-radius:14px;background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.5);font-size:13px;font-weight:600;cursor:pointer">Annulla</button></div>';
   document.body.appendChild(el);
-  el.querySelector('#_reconnect_btn').onclick = () => {
-    el.remove();
-    connectFn();
-    if (afterFn) afterFn();
-  };
+  el.addEventListener('click', e => { if (e.target === el) el.remove(); });
+}
+
+function _downloadGDriveFile(fileId, fname, token) {
+  toast('\u23f3 Caricamento ' + fname + '...');
+  fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', {
+    headers: { Authorization: 'Bearer ' + token }
+  })
+  .then(r => r.json())
+  .then(parsed => {
+    const result = _parsePayload(JSON.stringify(parsed));
+    if (!result || !result.datasets.length) { toast('File non valido o vuoto', 'error'); return; }
+    DB.datasets = result.datasets;
+    window._excludedClients = result.excl || [];
+    save(); render(); markSaved();
+    const tot = DB.datasets.reduce((s,ds) => s + ds.rows.length, 0);
+    toast('\u2713 ' + fname + ' caricato: ' + DB.datasets.length + ' dataset, ' + tot + ' righe');
+  })
+  .catch(e => toast('Errore download: ' + e.message, 'error'));
 }
 
 // ── Dropbox ──────────────────────────────────────────────────────────────
@@ -2638,7 +2549,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 13:42</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 13:53</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -3298,7 +3209,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260222-134238';
+const APP_VERSION = '20260222-135356';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
