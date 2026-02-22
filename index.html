@@ -793,7 +793,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.85);color:rgba(255,255,255,0.85)">Andrea Muraro</strong></div>
-          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 13:53</div>
+          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 14:09</div>
         </div>
       </div>
       <div class="header-actions">
@@ -1239,15 +1239,19 @@ function renderSavePathSection() {
     if (m === 'gdrive') {
       const hasToken = !!(SETTINGS.gdrive_token);
       return '<div style="margin-top:4px;background:rgba(255,255,255,0.04);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,0.08)">' +
-        '<div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Token di accesso Google Drive</div>' +
-        '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:10px">Vai su <a href=\"https://developers.google.com/oauthplayground\" target=\"_blank\" style=\"color:#4285f4\">OAuth Playground</a>, seleziona lo scope <strong style=\"color:#fff\">Drive API v3 → drive.file</strong>, autorizza e copia il token qui sotto.</div>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">' +
+        '<div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:1px">Token di accesso Google Drive</div>' +
+        '<button onclick="window._showGDriveGuide()" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:1.5px solid rgba(66,133,244,0.5);background:rgba(66,133,244,0.12);color:#4285f4;font-size:11px;font-weight:700;cursor:pointer">' +
+        '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>' +
+        'Come ottenere il Token</button>' +
+        '</div>' +
         '<div style="display:flex;gap:8px;margin-bottom:8px">' +
-        '<input id="sett-gdrive-token" type="password" placeholder="Incolla il token..." value="' + (SETTINGS.gdrive_token || '') + '" style="flex:1;padding:10px 12px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:13px">' +
+        '<input id="sett-gdrive-token" type="password" placeholder="Incolla qui il token copiato da OAuth Playground..." value="' + (SETTINGS.gdrive_token || '') + '" style="flex:1;padding:10px 12px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:13px">' +
         '<button onclick="window._saveGDriveToken()" style="padding:10px 16px;border-radius:10px;background:rgba(66,133,244,0.2);border:1.5px solid rgba(66,133,244,0.5);color:#4285f4;font-weight:700;font-size:12px;cursor:pointer">Salva</button>' +
         '</div>' +
         '<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:' + (hasToken ? '#4caf82' : 'rgba(255,255,255,0.3)') + '">' +
         '<span style="width:6px;height:6px;border-radius:50%;background:' + (hasToken ? '#4caf82' : 'rgba(255,255,255,0.2)') + '"></span>' +
-        (hasToken ? 'Token presente — premi Salva Dati per verificare' : 'Nessun token inserito') +
+        (hasToken ? '&#10003; Token presente &mdash; premi Salva Dati per verificare la connessione' : 'Nessun token inserito &mdash; clicca &quot;Come ottenere il Token&quot; per iniziare') +
         '</div></div>';
     }
     // Dropbox e OneDrive: token manuale (per ora)
@@ -1324,6 +1328,105 @@ function saveCloudToken() {
   saveSettings();
   toast('\u2713 Token salvato');
 }
+
+window._closeGDriveGuide = function() {
+  var o = document.getElementById('gdrive-guide-overlay');
+  if (o) o.remove();
+};
+window._showGDriveGuide = function() {
+  if (document.getElementById('gdrive-guide-overlay')) return;
+  const el = document.createElement('div');
+  el.id = 'gdrive-guide-overlay';
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.88);backdrop-filter:blur(12px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
+
+  const steps = [
+    {
+      n: '1',
+      title: 'Apri OAuth Playground',
+      desc: 'Clicca il pulsante qui sotto per aprire il sito di Google dove otterrai il token. Si aprirà in una nuova finestra.',
+      action: '<a href="https://developers.google.com/oauthplayground" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:12px;background:rgba(66,133,244,0.2);border:2px solid rgba(66,133,244,0.5);color:#4285f4;font-weight:700;font-size:13px;text-decoration:none">🔗 Apri OAuth Playground</a>',
+      note: ''
+    },
+    {
+      n: '2',
+      title: 'Seleziona le autorizzazioni',
+      desc: 'Nel pannello a sinistra scorri fino a trovare <strong style="color:#fff">Drive API v3</strong>. Cliccaci sopra per espanderlo, poi spunta la voce <strong style="color:#e2b84a">https://www.googleapis.com/auth/drive.file</strong>.',
+      action: '',
+      note: '💡 Questa autorizzazione permette all&#39;app di salvare e leggere solo i file che essa stessa crea, senza accedere al resto del tuo Drive.'
+    },
+    {
+      n: '3',
+      title: 'Autorizza con il tuo account Google',
+      desc: 'Clicca il pulsante blu <strong style="color:#fff">Authorize APIs</strong>. Si aprirà la finestra di login Google. Accedi con il tuo account e clicca <strong style="color:#fff">Consenti</strong>.',
+      action: '',
+      note: '⚠️ Se vedi un avviso &quot;App non verificata&quot;, clicca su <strong style="color:#fff">Avanzate</strong> → <strong style="color:#fff">Vai a OAuth Playground</strong>. È normale per le app personali.'
+    },
+    {
+      n: '4',
+      title: 'Scambia il codice per il token',
+      desc: 'Dopo il login vieni reindirizzato a OAuth Playground. Clicca il pulsante <strong style="color:#fff">Exchange authorization code for tokens</strong>.',
+      action: '',
+      note: ''
+    },
+    {
+      n: '5',
+      title: 'Copia il token',
+      desc: 'Nel campo <strong style="color:#e2b84a">Access token</strong> apparirà una stringa lunga che inizia con <strong style="color:#fff">ya29.</strong> — selezionala tutta e copiala (⌘C).',
+      action: '',
+      note: '⏱️ Il token dura circa 1 ora. Quando scade devi ripetere questo procedimento.'
+    },
+    {
+      n: '6',
+      title: 'Incolla il token nell&#39;app',
+      desc: 'Torna su questa app, incolla il token nel campo <strong style="color:#e2b84a">Token di accesso Google Drive</strong> e clicca <strong style="color:#fff">Salva</strong>.',
+      action: '',
+      note: '✅ Fatto! Da questo momento "Salva Dati" scriverà il file direttamente nel tuo Google Drive.'
+    }
+  ];
+
+  const stepsHTML = steps.map(s =>
+    '<div style="display:flex;gap:14px;padding:16px;background:rgba(255,255,255,0.04);border-radius:14px;border:1px solid rgba(255,255,255,0.08)">' +
+    '<div style="flex-shrink:0;width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#4285f4,#1a73e8);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff">' + s.n + '</div>' +
+    '<div style="flex:1;min-width:0">' +
+    '<div style="font-size:14px;font-weight:800;color:#fff;margin-bottom:5px">' + s.title + '</div>' +
+    '<div style="font-size:12px;color:rgba(255,255,255,0.6);line-height:1.6;margin-bottom:' + (s.action || s.note ? '10px' : '0') + '">' + s.desc + '</div>' +
+    (s.action ? '<div style="margin-bottom:' + (s.note ? '10px' : '0') + '">' + s.action + '</div>' : '') +
+    (s.note ? '<div style="font-size:11px;color:rgba(255,255,255,0.4);background:rgba(255,255,255,0.04);border-radius:8px;padding:8px 10px;line-height:1.5">' + s.note + '</div>' : '') +
+    '</div></div>'
+  ).join('');
+
+  el.innerHTML =
+    '<div style="background:#141820;border:2px solid rgba(66,133,244,0.3);border-radius:24px;padding:0;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,0.8)">' +
+    // Header
+    '<div style="background:linear-gradient(135deg,rgba(66,133,244,0.2),rgba(26,115,232,0.1));padding:24px 24px 20px;border-bottom:1px solid rgba(255,255,255,0.07);position:sticky;top:0;border-radius:22px 22px 0 0;backdrop-filter:blur(20px)">' +
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">' +
+    '<div style="display:flex;align-items:center;gap:14px">' +
+    '<div style="width:48px;height:48px;border-radius:14px;background:rgba(66,133,244,0.2);border:2px solid rgba(66,133,244,0.4);display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+    '<svg viewBox="0 0 87.3 78" width="26" height="26"><path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H1.1c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="M43.65 25L29.9 1.2C28.55 2 27.4 3.1 26.6 4.5L1.2 49.5C.4 50.9 0 52.45 0 54h27.5z" fill="#00ac47"/><path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 11.5z" fill="#ea4335"/><path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="M59.8 54H27.5L13.75 77.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="M73.4 27.5l-12.8-22.2C59.8 3.9 58.65 2.8 57.3 2L43.55 25 59.7 54h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>' +
+    '</div>' +
+    '<div>' +
+    '<div style="font-size:18px;font-weight:900;color:#fff;margin-bottom:3px">Come ottenere il Token</div>' +
+    '<div style="font-size:12px;color:rgba(255,255,255,0.45)">Google Drive · 6 passi semplici · circa 3 minuti</div>' +
+    '</div>' +
+    '</div>' +
+    '<button onclick="window._closeGDriveGuide()" style="flex-shrink:0;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">&#x2715;</button>' +
+    '</div>' +
+    '</div>' +
+    // Corpo
+    '<div style="padding:20px 24px 28px;display:flex;flex-direction:column;gap:10px">' +
+    stepsHTML +
+    // Footer
+    '<div style="margin-top:8px;padding:14px;background:rgba(226,184,74,0.07);border:1px solid rgba(226,184,74,0.2);border-radius:12px;display:flex;gap:10px;align-items:flex-start">' +
+    '<span style="font-size:18px;flex-shrink:0">🔄</span>' +
+    '<div style="font-size:12px;color:rgba(255,255,255,0.5);line-height:1.6"><strong style="color:#e2b84a">Token in scadenza?</strong> Il token Google dura circa 1 ora. Se "Salva Dati" smette di funzionare, torna su OAuth Playground e ripeti dal passo 3 — ci vogliono solo 30 secondi.</div>' +
+    '</div>' +
+    '<button onclick="window._closeGDriveGuide()" style="width:100%;margin-top:4px;padding:14px;border-radius:14px;background:linear-gradient(135deg,rgba(66,133,244,0.25),rgba(66,133,244,0.15));border:2px solid rgba(66,133,244,0.5);color:#4285f4;font-weight:700;font-size:14px;cursor:pointer">Ho capito, chiudi la guida</button>' +
+    '</div>' +
+    '</div>';
+
+  document.body.appendChild(el);
+  el.addEventListener('click', e => { if (e.target === el) el.remove(); });
+};
 
 window._saveGDriveToken = function() {
   var inp = document.getElementById('sett-gdrive-token');
@@ -2549,7 +2652,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 13:53</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 14:09</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -3209,7 +3312,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260222-135356';
+const APP_VERSION = '20260222-140927';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
@@ -3314,7 +3417,7 @@ window.addEventListener('beforeunload', function(e) {
   }
 });
 
-// Su PWA / visibilitychange: salva quando l'app va in background
+// Su PWA / visibilitychange: salva quando l&#39;app va in background
 document.addEventListener('visibilitychange', function() {
   if (document.visibilityState === 'hidden' && DB.datasets.length > 0) {
     save();
