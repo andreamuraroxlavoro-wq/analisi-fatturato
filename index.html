@@ -793,7 +793,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.85);color:rgba(255,255,255,0.85)">Andrea Muraro</strong></div>
-          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 19:00</div>
+          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 21:40</div>
         </div>
       </div>
       <div class="header-actions">
@@ -1047,8 +1047,88 @@ function onSaveDatiClick() {
     showSaveMethodModal();
     return;
   }
-  // Chiedi: sovrascrivi o nuovo file?
-  showSaveOptionsModal(method);
+  // Per cloud: sincronizza il contatore con i file presenti, poi apri modal
+  if (method === 'dropbox' || method === 'onedrive') {
+    toast('\u23f3 Verifica file sul cloud...');
+    _syncCloudCounter(method).then(() => showSaveOptionsModal(method));
+  } else {
+    showSaveOptionsModal(method);
+  }
+}
+
+// Interroga il cloud, trova il numero più alto tra i file DB_Analisi_Fatturato_PRO_NNN.json
+// e aggiorna SETTINGS.fileCounter di conseguenza
+// _cloudFiles: cache dei file cloud (aggiornata ad ogni apertura modal)
+// Struttura: [ { name, num, modified } ] ordinati per modified DESC
+window._cloudFiles = null;
+
+function _syncCloudCounter(method) {
+  const base       = 'DB_Analisi_Fatturato_PRO';
+  window._cloudFiles = null; // reset cache
+
+  const extractNum = name => {
+    const m = name.match(/DB_Analisi_Fatturato_PRO_(\d+)\.json$/i);
+    return m ? parseInt(m[1], 10) : 0;
+  };
+  const parseFiles = (entries) => {
+    return entries
+      .filter(f => f.name && f.name.startsWith(base) && extractNum(f.name) > 0)
+      .map(f => ({ name: f.name, num: extractNum(f.name), modified: f.modified || f.server_modified || f.lastModifiedDateTime || null }))
+      .sort((a, b) => {
+        // Ordina per data modifica DESC (più recente prima)
+        if (a.modified && b.modified) return new Date(b.modified) - new Date(a.modified);
+        return b.num - a.num; // fallback: numero più alto
+      });
+  };
+  const syncCounter = (files) => {
+    if (!files.length) return;
+    const cloudMax = Math.max(...files.map(f => f.num));
+    if (cloudMax > (SETTINGS.fileCounter || 1)) {
+      SETTINGS.fileCounter = cloudMax;
+      saveSettings();
+    }
+    window._cloudFiles = files;
+  };
+
+  if (method === 'dropbox') {
+    const token = SETTINGS.dropbox_token;
+    if (!token) return Promise.resolve();
+    const tryList = path => fetch('https://api.dropboxapi.com/2/files/list_folder', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: path, recursive: false })
+    }).then(r => r.json());
+
+    return tryList('')
+      .then(data => data.error_summary ? tryList('/AnalisiFatturatoPRO') : data)
+      .then(data => {
+        if (!data || !data.entries) return;
+        syncCounter(parseFiles(data.entries.map(f => ({
+          name: f.name, num: extractNum(f.name),
+          modified: f.server_modified || f.client_modified || null
+        }))));
+      })
+      .catch(() => {});
+  }
+
+  if (method === 'onedrive') {
+    const token = SETTINGS.onedrive_token;
+    if (!token) return Promise.resolve();
+    return fetch("https://graph.microsoft.com/v1.0/me/drive/special/approot/children?$select=name,lastModifiedDateTime", {
+      headers: { Authorization: 'Bearer ' + token }
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (!data.value) return;
+        syncCounter(parseFiles(data.value.map(f => ({
+          name: f.name, num: extractNum(f.name),
+          modified: f.lastModifiedDateTime || null
+        }))));
+      })
+      .catch(() => {});
+  }
+
+  return Promise.resolve();
 }
 
 function showSaveMethodModal() {
@@ -1100,8 +1180,16 @@ function _methodColor(m) {
 function showSaveOptionsModal(method) {
   const base     = 'DB_Analisi_Fatturato_PRO';
   const pad      = n => String(n).padStart(3,'0');
-  const nameOver = base + '_' + pad(SETTINGS.fileCounter || 1) + '.json';
-  const nameNew  = base + '_' + pad((SETTINGS.fileCounter || 1) + 1) + '.json';
+  const files    = window._cloudFiles || []; // file cloud con date reali
+  // Il file "attuale" è quello con la data di modifica più recente (index 0 dopo sort)
+  const latestFile = files.length ? files[0] : null;
+  const latestNum  = latestFile ? latestFile.num : (SETTINGS.fileCounter || 1);
+  const nameOver   = latestFile ? latestFile.name : (base + '_' + pad(SETTINGS.fileCounter || 1) + '.json');
+  const nameNew    = base + '_' + pad(latestNum + 1) + '.json';
+  // Formatta la data dell'ultimo salvataggio
+  const latestDate = latestFile && latestFile.modified
+    ? new Date(latestFile.modified).toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
+    : null;
   const col      = _methodColor(method);
   const tot      = DB.datasets.reduce((s,ds) => s + ds.rows.length, 0);
   const el = document.createElement('div');
@@ -1124,9 +1212,17 @@ function showSaveOptionsModal(method) {
 
     // ── Pulsanti ──
     '<div style="padding:20px 24px 40px;display:flex;flex-direction:column;gap:10px">' +
-    '<button onclick="window._doSaveOverwrite()" style="width:100%;padding:16px 14px;border-radius:16px;font-size:14px;font-weight:700;cursor:pointer;background:rgba(226,184,74,0.12);border:2px solid rgba(226,184,74,0.45);color:#e2b84a;text-align:left;display:flex;align-items:center;gap:14px">' +
+    '<button onclick="window._doSaveOverwrite()" style="width:100%;padding:16px 14px;border-radius:16px;font-size:14px;font-weight:700;cursor:pointer;background:rgba(226,184,74,0.15);border:2px solid rgba(226,184,74,0.6);color:#e2b84a;text-align:left;display:flex;align-items:center;gap:14px;position:relative">' +
     '<span style="font-size:26px;flex-shrink:0">♻️</span>' +
-    '<div><div style="font-size:14px;font-weight:800">Sovrascrivi file attuale</div><div style="font-size:11px;font-weight:500;opacity:0.6;margin-top:2px">' + nameOver + '</div></div>' +
+    '<div style="flex:1;min-width:0">' +
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+    '<div style="font-size:14px;font-weight:800">Sovrascrivi file attuale</div>' +
+    (latestDate ? '<span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:rgba(226,184,74,0.25);border:1px solid rgba(226,184,74,0.6);color:#e2b84a;letter-spacing:0.5px">⭐ PIÙ RECENTE</span>' : '') +
+    '</div>' +
+    '<div style="font-size:12px;font-weight:600;color:rgba(226,184,74,0.8);margin-top:3px">' + nameOver + '</div>' +
+    (latestDate ? '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px">📅 Ultimo salvataggio: ' + latestDate + '</div>' : '') +
+    (files.length > 1 ? '<div style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:1px">' + files.length + ' file presenti sul cloud · ordinati per data</div>' : '') +
+    '</div>' +
     '</button>' +
     '<button onclick="window._doSaveNew()" style="width:100%;padding:16px 14px;border-radius:16px;font-size:14px;font-weight:700;cursor:pointer;background:rgba(76,175,130,0.12);border:2px solid rgba(76,175,130,0.45);color:#4caf82;text-align:left;display:flex;align-items:center;gap:14px">' +
     '<span style="font-size:26px;flex-shrink:0">✨</span>' +
@@ -3160,7 +3256,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 19:00</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 21:40</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -3820,7 +3916,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260222-190053';
+const APP_VERSION = '20260222-214004';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
