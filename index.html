@@ -793,7 +793,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.85);color:rgba(255,255,255,0.85)">Andrea Muraro</strong></div>
-          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 18:54</div>
+          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 19:00</div>
         </div>
       </div>
       <div class="header-actions">
@@ -2903,27 +2903,30 @@ function _renderClientiList() {
 }
 
 function _updateClientiCommButtons() {
-  const dfC = _clientComm || [];
+  const dfC   = _clientComm || [];
   const comms = [...new Set(allRows().map(r=>r.commerciale||'').filter(Boolean).filter(c=>c!=='—'))].sort();
+  const wrap  = document.getElementById('clienti-comm-wrap');
+  if (!wrap) return;
 
-  // Aggiorna pulsante "Tutti"
-  const tuttiBtn = document.getElementById('clienti-comm-tutti');
+  // Pulsante "Tutti"
+  const tuttiBtn = wrap.querySelector('[data-comm="__tutti__"]');
   if (tuttiBtn) {
     if (!dfC.length) tuttiBtn.classList.add('active');
     else             tuttiBtn.classList.remove('active');
   }
 
-  // Aggiorna pulsanti singoli commerciali
-  comms.forEach(c => {
-    const btn = document.getElementById('clienti-comm-btn-' + CSS.escape(c));
-    if (!btn) return;
+  // Pulsanti commerciali — usa data-comm per trovare ciascun btn
+  wrap.querySelectorAll('[data-comm]').forEach(btn => {
+    const c = btn.getAttribute('data-comm');
+    if (c === '__tutti__') return;
     const isActive = dfC.includes(c);
-    const col  = commColor(comms, c);
-    btn.style.background  = isActive ? col.bg.replace('0.18','0.30') : 'rgba(255,255,255,0.07)';
-    btn.style.borderColor = isActive ? col.border : col.border + 'aa';
-    btn.style.color       = isActive ? col.text   : '#ffffffcc';
-    btn.style.fontWeight  = isActive ? '800' : '500';
-    btn.style.boxShadow   = isActive ? '0 0 14px ' + col.border + '66' : 'none';
+    const col = commColor(comms, c);
+    btn.style.background  = isActive ? col.bg.replace('0.18','0.30')  : 'rgba(255,255,255,0.07)';
+    btn.style.borderColor = isActive ? col.border                      : col.border + '55';
+    btn.style.color       = isActive ? col.text                        : 'rgba(255,255,255,0.6)';
+    btn.style.fontWeight  = isActive ? '800'                           : '500';
+    btn.style.borderWidth = isActive ? '2px'                           : '1.5px';
+    btn.style.boxShadow   = isActive ? '0 0 16px ' + col.border + '88' : 'none';
   });
 }
 
@@ -3038,8 +3041,8 @@ function renderClienti() {
         if (!comms.length) return '';
         const dfC = _clientComm || [];
         return '<div class="filter-group-label" style="margin-bottom:8px;margin-left:-20px;margin-right:-20px">🧑\u200d💼 Commerciale</div>'
-          + '<div class="pill-row" style="margin-bottom:10px;align-items:center">'
-          + '<button id="clienti-comm-tutti" class="fpill ' + (!dfC.length ? 'active' : '') + '" onclick="_clientComm=[];_renderClientiList()">Tutti</button>'
+          + '<div id="clienti-comm-wrap" class="pill-row" style="margin-bottom:10px;align-items:center">'
+          + '<button data-comm="__tutti__" class="fpill ' + (!dfC.length ? 'active' : '') + '" onclick="_clientComm=[];_renderClientiList()">Tutti</button>'
           + comms.map(c => {
               const isActive = dfC.includes(c);
               const col = commColor(comms, c);
@@ -3049,7 +3052,7 @@ function renderClienti() {
               const fw   = isActive ? '800' : '500';
               const glow = isActive ? ';box-shadow:0 0 14px ' + col.border + '66' : '';
               const safeC = c.replace(/'/g,"\\'");
-              return '<button id="clienti-comm-btn-' + esc(c) + '" class="fpill" style="background:' + bg + ';border-color:' + bord + ';color:' + clr + ';font-weight:' + fw + glow + '" onclick="(function(){if(!_clientComm)_clientComm=[];var i=_clientComm.indexOf(\'' + safeC + '\');if(i>=0)_clientComm.splice(i,1);else _clientComm.push(\'' + safeC + '\');_renderClientiList();})()">\u200b' + esc(c) + '</button>';
+              return '<button data-comm="' + safeC + '" class="fpill" style="background:' + bg + ';border-color:' + bord + ';color:' + clr + ';font-weight:' + fw + ';border-width:' + (isActive?'2px':'1.5px') + glow + '" onclick="(function(){if(!_clientComm)_clientComm=[];var i=_clientComm.indexOf(\'' + safeC + '\');if(i>=0)_clientComm.splice(i,1);else _clientComm.push(\'' + safeC + '\');_renderClientiList();})()">\u200b' + esc(c) + '</button>';
             }).join('')
           + '</div>';
       })()}
@@ -3157,7 +3160,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 18:54</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 19:00</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -3817,7 +3820,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260222-185458';
+const APP_VERSION = '20260222-190053';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
