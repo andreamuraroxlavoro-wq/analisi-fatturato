@@ -793,7 +793,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.85);color:rgba(255,255,255,0.85)">Andrea Muraro</strong></div>
-          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 17:47</div>
+          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 17:56</div>
         </div>
       </div>
       <div class="header-actions">
@@ -1764,38 +1764,78 @@ function _downloadGDriveFile(fileId, fname, token) {
 function saveToDropbox(blob, fname) {
   const token = SETTINGS.dropbox_token;
   if (!token) { toast('Token Dropbox non configurato — vai in Impostazioni', 'error'); return; }
-  // App Folder: il path è sempre /{fname} — Dropbox mette tutto in Apps/AnalisiFatturatoPRO/
-  const path = '/' + fname;
+
+  // Controlla prima quale tipo di app è (App Folder o Full Dropbox)
+  // usando get_current_account per vedere il namespace
+  fetch('https://api.dropboxapi.com/2/users/get_current_account', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: 'null'
+  })
+  .then(r => r.json())
+  .then(account => {
+    if (account.error_summary) {
+      toast('Token Dropbox non valido — rigeneralo in Impostazioni', 'error');
+      return;
+    }
+    // App Folder: path = /{fname}
+    // Full Dropbox: path = /AnalisiFatturatoPRO/{fname}
+    // Lo scopriamo guardando se l'account ha un root_namespace_id diverso
+    // Per sicurezza proviamo prima /{fname} (App Folder)
+    _dropboxTryUpload(blob, fname, token, '/' + fname, true);
+  })
+  .catch(() => _dropboxTryUpload(blob, fname, token, '/' + fname, true));
+}
+
+function _dropboxTryUpload(blob, fname, token, path, retryWithFull) {
   blob.arrayBuffer().then(buf => {
     fetch('https://content.dropboxapi.com/2/files/upload', {
       method: 'POST',
       headers: {
         Authorization: 'Bearer ' + token,
         'Content-Type': 'application/octet-stream',
-        'Dropbox-API-Arg': JSON.stringify({ path: path, mode: { '.tag': 'overwrite' }, autorename: false, mute: false })
+        'Dropbox-API-Arg': JSON.stringify({
+          path: path,
+          mode: { '.tag': 'overwrite' },
+          autorename: false,
+          mute: false,
+          strict_conflict: false
+        })
       },
       body: buf
     })
-    .then(r => {
-      if (!r.ok) {
-        return r.text().then(txt => { throw new Error('HTTP ' + r.status + ': ' + txt); });
-      }
-      return r.json();
-    })
-    .then(data => {
-      if (data.id || data.name) {
+    .then(r => r.text().then(txt => ({ status: r.status, txt })))
+    .then(({ status, txt }) => {
+      let data;
+      try { data = JSON.parse(txt); } catch(e) { data = { raw: txt }; }
+
+      if (status === 200 && (data.id || data.name)) {
         save(); markSaved();
         toast('\u2713 Salvato su Dropbox: ' + fname);
+        return;
+      }
+
+      const errSum = (data.error_summary || '');
+      console.error('[AFP] Dropbox HTTP ' + status + ':', txt);
+
+      // Se insufficient_space con path App Folder, riprova con Full Dropbox path
+      if (errSum.includes('insufficient_space') && retryWithFull && path === '/' + fname) {
+        toast('\u23f3 Riprovo con percorso Full Dropbox...');
+        _dropboxTryUpload(blob, fname, token, '/AnalisiFatturatoPRO/' + fname, false);
+        return;
+      }
+
+      if (errSum.includes('insufficient_space')) {
+        toast('Errore Dropbox: spazio insufficiente. Verifica il tuo account Dropbox.', 'error');
+      } else if (status === 401) {
+        toast('Token Dropbox scaduto o non valido — rigeneralo in Impostazioni', 'error');
+      } else if (status === 409) {
+        toast('Errore Dropbox 409: ' + errSum + ' — assicurati che i permessi siano corretti e rigenera il token', 'error');
       } else {
-        const err = data.error_summary || data['.tag'] || JSON.stringify(data);
-        toast('Errore Dropbox: ' + err, 'error');
-        console.error('[AFP] Dropbox risposta completa:', JSON.stringify(data));
+        toast('Errore Dropbox (' + status + '): ' + (errSum || txt.substring(0, 80)), 'error');
       }
     })
-    .catch(e => {
-      toast('Errore Dropbox: ' + e.message, 'error');
-      console.error('[AFP] Dropbox exception:', e);
-    });
+    .catch(e => toast('Errore rete Dropbox: ' + e.message, 'error'));
   });
 }
 
@@ -2900,7 +2940,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 17:47</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 17:56</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -3560,7 +3600,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260222-174740';
+const APP_VERSION = '20260222-175655';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
