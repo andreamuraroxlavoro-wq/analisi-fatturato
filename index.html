@@ -793,7 +793,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.85);color:rgba(255,255,255,0.85)">Andrea Muraro</strong></div>
-          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 22:08</div>
+          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 22:26</div>
         </div>
       </div>
       <div class="header-actions">
@@ -2160,6 +2160,96 @@ function commColor(commList, comm) {
   return COMM_PALETTE[idx % COMM_PALETTE.length];
 }
 
+// Helper: costruisce le righe della lista clienti Dashboard con badge commerciale
+function _buildClientsList(allClients, excl, showAll, filteredRows) {
+  const MESI = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+  // Mappa cliente → commerciale (prende il più frequente)
+  const clienteComm = {};
+  filteredRows.forEach(r => {
+    if (!r.commerciale || r.commerciale === '—') return;
+    if (!clienteComm[r.cliente]) clienteComm[r.cliente] = {};
+    clienteComm[r.cliente][r.commerciale] = (clienteComm[r.cliente][r.commerciale]||0) + 1;
+  });
+  const commsAll = [...new Set(filteredRows.map(r=>r.commerciale||'').filter(Boolean).filter(c=>c!=='—'))].sort();
+  const getComm = nome => {
+    const m = clienteComm[nome];
+    if (!m) return null;
+    return Object.entries(m).sort((a,b)=>b[1]-a[1])[0][0];
+  };
+
+  const slotCount    = showAll ? allClients.length : 20;
+  const activeClients = allClients.filter(([n]) => !excl.includes(n)).slice(0, slotCount);
+  const exclClients  = allClients.filter(([n]) => excl.includes(n));
+  const finalList    = [
+    ...activeClients.map((entry, i) => ({ entry, isExcl: false, isSub: i >= 20, isExtra: i >= 20 })),
+    ...exclClients.map(entry => ({ entry, isExcl: true, isSub: false, isExtra: false }))
+  ];
+  const maxVal = activeClients.length ? activeClients[0][1] : (allClients[0] ? allClients[0][1] : 1);
+
+  const rows = finalList.map(({entry: [nome, val], isExcl, isSub, isExtra}) => {
+    const barW        = isExcl ? 0 : (val / maxVal * 100).toFixed(1);
+    const rank        = allClients.findIndex(([n]) => n === nome) + 1;
+    const mc          = rank===1 ? '#e2b84a' : rank===2 ? '#b0b8c8' : rank===3 ? '#c87b4a' : 'rgba(255,255,255,0.22)';
+    const safeName    = nome.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const bg          = isExcl ? 'background:rgba(224,92,92,0.12);' : (isExtra ? 'background:rgba(116,185,255,0.04);' : '');
+    const borderStyle = isExcl ? 'border:2px solid rgba(224,92,92,0.55);' : (isExtra ? 'border:2px solid rgba(116,185,255,0.12);' : 'border:2px solid transparent;');
+    const nameColor   = isExcl ? 'rgba(255,255,255,0.45)' : (isExtra ? 'rgba(255,255,255,0.75)' : '#fff');
+    const nameFw      = isExcl ? '500' : '600';
+    const amountStyle = isExcl ? 'text-decoration:line-through;color:rgba(255,100,100,0.6)' : '';
+    const barColor    = isExcl ? 'rgba(224,92,92,0.35)' : (isExtra ? 'rgba(116,185,255,0.6)' : 'var(--gold)');
+    const exclTag     = isExcl
+      ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#e05c5c;background:rgba(224,92,92,0.15);border:1px solid rgba(224,92,92,0.4);border-radius:20px;padding:2px 8px;flex-shrink:0;margin-left:4px">✕ escluso</span>'
+      : (isSub ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#4caf82;background:rgba(76,175,130,0.12);border:1px solid rgba(76,175,130,0.35);border-radius:20px;padding:2px 8px;flex-shrink:0;margin-left:4px">↑ nuovo</span>' : '');
+    const hoverBg     = isExcl ? 'rgba(224,92,92,0.18)' : 'rgba(255,255,255,0.05)';
+    const leaveBg     = isExcl ? 'rgba(224,92,92,0.12)' : (isExtra ? 'rgba(116,185,255,0.04)' : 'transparent');
+
+    // Badge commerciale
+    const comm    = getComm(nome);
+    const commBadge = comm
+      ? (() => {
+          const col = commColor(commsAll, comm);
+          return '<span style="display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:' + col.bg.replace('0.18','0.25') + ';border:1px solid ' + col.border + '88;color:' + col.text + ';flex-shrink:0;white-space:nowrap;margin-left:6px">' + esc(comm) + '</span>';
+        })()
+      : '';
+
+    return '<div onclick="(function(){if(!window._excludedClients)window._excludedClients=[];var i=window._excludedClients.indexOf(\'' + safeName + '\');if(i>=0)window._excludedClients.splice(i,1);else window._excludedClients.push(\'' + safeName + '\');markUnsaved();save();_updateDashExclude();})()"'
+      + ' style="margin-bottom:8px;cursor:pointer;padding:10px 12px;border-radius:10px;transition:all 0.18s;' + bg + borderStyle + '"'
+      + ' onmouseenter="this.style.background=\'' + hoverBg + '\'"'
+      + ' onmouseleave="this.style.background=\'' + leaveBg + '\'">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;gap:8px">'
+        + '<div style="display:flex;align-items:center;gap:7px;min-width:0;overflow:hidden;flex:1">'
+          + '<span style="font-size:11px;font-weight:700;color:' + mc + ';flex-shrink:0;width:18px;text-align:right">' + rank + '</span>'
+          + '<span style="font-size:13px;font-weight:' + nameFw + ';color:' + nameColor + ';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(nome) + '</span>'
+          + commBadge
+          + exclTag
+        + '</div>'
+        + '<span class="amount" style="font-size:13px;flex-shrink:0;' + amountStyle + '">' + fmtEur(val) + '</span>'
+      + '</div>'
+      + '<div style="background:rgba(255,255,255,0.08);border-radius:4px;height:5px;overflow:hidden">'
+        + '<div style="background:' + barColor + ';height:100%;width:' + barW + '%;border-radius:4px;transition:width 0.4s ease"></div>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+
+  const extraCount = allClients.length - 20;
+  const toggleBtn = extraCount > 0
+    ? '<div style="margin-top:14px">'
+      + '<button onclick="window._showAllClients=!' + showAll + ';render()"'
+      + ' style="width:100%;padding:13px;border-radius:14px;cursor:pointer;font-family:sans-serif;font-size:13px;font-weight:700;transition:all 0.18s;display:flex;align-items:center;justify-content:center;gap:8px;'
+      + (showAll
+          ? 'background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);'
+          : 'background:linear-gradient(135deg,rgba(116,185,255,0.15),rgba(116,185,255,0.08));border:2px solid rgba(116,185,255,0.45);color:#74b9ff;box-shadow:0 2px 12px rgba(116,185,255,0.15);')
+      + '">'
+      + (showAll
+          ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg> Mostra solo Top 20'
+          : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg> Mostra tutti i ' + allClients.length + ' clienti')
+      + '</button>'
+      + '</div>'
+    : '';
+
+  return rows + toggleBtn;
+}
+
 function renderDashboard() {
   const rows = allRows();
   if (!rows.length) return emptyState('📊','Nessun dato ancora','Importa il tuo primo file Excel per vedere la dashboard');
@@ -2336,25 +2426,25 @@ if (window._showAllClients === undefined) window._showAllClients = false;
     </div>
 
     <!-- KPI -->
-    <div class="kpi-row">
+    <div id="dash-kpi-row" class="kpi-row">
       <div class="kpi-card">
         <div class="kpi-label">Fatturato</div>
-        <div class="kpi-value">${fmtK(totalF)}</div>
-        <div class="kpi-sub">${fmtEur(totalF)}</div>
+        <div id="dash-kpi-fatturato" class="kpi-value">${fmtK(totalF)}</div>
+        <div id="dash-kpi-fatturato-sub" class="kpi-sub">${fmtEur(totalF)}</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">Fatture</div>
-        <div class="kpi-value">${filtered.length}</div>
+        <div id="dash-kpi-fatture" class="kpi-value">${filtered.length}</div>
         <div class="kpi-sub">nel periodo</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">Clienti attivi</div>
-        <div class="kpi-value">${new Set(filtered.map(r=>r.cliente)).size}</div>
-        <div class="kpi-sub">totale: ${clientiTot}</div>
+        <div id="dash-kpi-clienti" class="kpi-value">${new Set(filtered.map(r=>r.cliente)).size}</div>
+        <div id="dash-kpi-clienti-sub" class="kpi-sub">totale: ${clientiTot}</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">Media fattura</div>
-        <div class="kpi-value">${fmtK(filtered.length ? totalF/filtered.length : 0)}</div>
+        <div id="dash-kpi-media" class="kpi-value">${fmtK(filtered.length ? totalF/filtered.length : 0)}</div>
         <div class="kpi-sub">per fattura</div>
       </div>
     </div>
@@ -2426,90 +2516,18 @@ if (window._showAllClients === undefined) window._showAllClients = false;
     <div class="card">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
         <div class="card-title" style="margin-bottom:0">🏅 Top 20 clienti</div>
-        ${(window._excludedClients||[]).length > 0 ? `
+        <span id="dash-excl-badge" style="display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap">${(window._excludedClients||[]).length > 0 ? `
           <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#e05c5c;background:rgba(224,92,92,0.15);border:1.5px solid rgba(224,92,92,0.45);border-radius:20px;padding:3px 10px">
             ✕ ${(window._excludedClients||[]).length} esclus${(window._excludedClients||[]).length===1?'o':'i'}
           </span>
-          <button onclick="window._excludedClients=[];markUnsaved();save();render()"
+          <button onclick="window._excludedClients=[];markUnsaved();save();_updateDashExclude()"
             style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;border:1.5px solid rgba(76,175,130,0.55);background:rgba(76,175,130,0.12);color:#4caf82;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.18s"
             onmouseenter="this.style.background='rgba(76,175,130,0.22)'"
             onmouseleave="this.style.background='rgba(76,175,130,0.12)'">
             ↺ Ripristina tutti
-          </button>` : ''}
+          </button>` : ''}</span>
       </div>
-      ${(function(){
-        const excl = window._excludedClients || [];
-        const showAll = window._showAllClients || false;
-
-        // Quanti slot attivi mostrare (20 + lista estesa)
-        const slotCount = showAll ? allClients.length : 20;
-
-        // Clienti attivi (non esclusi) in ordine di fatturato, prendi i primi slotCount
-        const activeClients = allClients.filter(([n]) => !excl.includes(n)).slice(0, slotCount);
-        // Clienti esclusi — mostrati in fondo, sempre ordinati per fatturato originale
-        const exclClients = allClients.filter(([n]) => excl.includes(n));
-
-        // Lista finale: attivi in ordine → esclusi in fondo
-        const finalList = [
-          ...activeClients.map((entry, i) => ({ entry, isExcl: false, isSub: i >= 20, isExtra: i >= 20 })),
-          ...exclClients.map(entry => ({ entry, isExcl: true, isSub: false, isExtra: false }))
-        ];
-
-        const maxVal = activeClients.length ? activeClients[0][1] : (allClients[0] ? allClients[0][1] : 1);
-
-        const rows = finalList.map(({entry: [nome,val], isExcl, isSub, isExtra}, i) => {
-          const barW = isExcl ? 0 : (val / maxVal * 100).toFixed(1);
-          const rank = allClients.findIndex(([n]) => n === nome) + 1;
-          const mc = rank===1 ? '#e2b84a' : rank===2 ? '#b0b8c8' : rank===3 ? '#c87b4a' : 'rgba(255,255,255,0.22)';
-          const safeName = nome.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-          const bg          = isExcl ? 'background:rgba(224,92,92,0.12);' : (isExtra ? 'background:rgba(116,185,255,0.04);' : '');
-          const borderStyle = isExcl ? 'border:2px solid rgba(224,92,92,0.55);' : (isExtra ? 'border:2px solid rgba(116,185,255,0.12);' : 'border:2px solid transparent;');
-          const nameColor   = isExcl ? 'rgba(255,255,255,0.45)' : (isExtra ? 'rgba(255,255,255,0.75)' : '#fff');
-          const nameFw      = isExcl ? '500' : '600';
-          const amountStyle = isExcl ? 'text-decoration:line-through;color:rgba(255,100,100,0.6)' : '';
-          const barColor    = isExcl ? 'rgba(224,92,92,0.35)' : (isExtra ? 'rgba(116,185,255,0.6)' : 'var(--gold)');
-          const exclTag     = isExcl
-            ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#e05c5c;background:rgba(224,92,92,0.15);border:1px solid rgba(224,92,92,0.4);border-radius:20px;padding:2px 8px;flex-shrink:0;margin-left:4px">✕ escluso</span>'
-            : (isSub ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#4caf82;background:rgba(76,175,130,0.12);border:1px solid rgba(76,175,130,0.35);border-radius:20px;padding:2px 8px;flex-shrink:0;margin-left:4px">↑ nuovo</span>' : '');
-          const hoverBg = isExcl ? 'rgba(224,92,92,0.18)' : 'rgba(255,255,255,0.05)';
-          const leaveBg = isExcl ? 'rgba(224,92,92,0.12)' : (isExtra ? 'rgba(116,185,255,0.04)' : 'transparent');
-          return '<div onclick="(function(){if(!window._excludedClients)window._excludedClients=[];var i=window._excludedClients.indexOf(\'' + safeName + '\');if(i>=0)window._excludedClients.splice(i,1);else window._excludedClients.push(\'' + safeName + '\');markUnsaved();save();render();})()"'
-            + ' style="margin-bottom:8px;cursor:pointer;padding:10px 12px;border-radius:10px;transition:all 0.18s;' + bg + borderStyle + '"'
-            + ' onmouseenter="this.style.background=\'' + hoverBg + '\'"'
-            + ' onmouseleave="this.style.background=\'' + leaveBg + '\'">'
-            + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;gap:8px">'
-              + '<div style="display:flex;align-items:center;gap:7px;min-width:0;overflow:hidden">'
-                + '<span style="font-size:11px;font-weight:700;color:' + mc + ';flex-shrink:0;width:18px;text-align:right">' + rank + '</span>'
-                + '<span style="font-size:13px;font-weight:' + nameFw + ';color:' + nameColor + ';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(nome) + '</span>'
-                + exclTag
-              + '</div>'
-              + '<span class="amount" style="font-size:13px;flex-shrink:0;' + amountStyle + '">' + fmtEur(val) + '</span>'
-            + '</div>'
-            + '<div style="background:rgba(255,255,255,0.08);border-radius:4px;height:5px;overflow:hidden">'
-              + '<div style="background:' + barColor + ';height:100%;width:' + barW + '%;border-radius:4px;transition:width 0.4s ease"></div>'
-            + '</div>'
-            + '</div>';
-        }).join('');
-
-        // Pulsante espandi/riduci (solo se ci sono clienti oltre i top20)
-        const extraCount = allClients.length - 20;
-        const toggleBtn = extraCount > 0
-          ? '<div style="margin-top:14px">'
-            + '<button onclick="window._showAllClients=!' + showAll + ';render()"'
-            + ' style="width:100%;padding:13px;border-radius:14px;cursor:pointer;font-family:sans-serif;font-size:13px;font-weight:700;transition:all 0.18s;display:flex;align-items:center;justify-content:center;gap:8px;'
-            + (showAll
-                ? 'background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);'
-                : 'background:linear-gradient(135deg,rgba(116,185,255,0.15),rgba(116,185,255,0.08));border:2px solid rgba(116,185,255,0.45);color:#74b9ff;box-shadow:0 2px 12px rgba(116,185,255,0.15);')
-            + '">'
-            + (showAll
-                ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg> Mostra solo Top 20'
-                : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg> Mostra tutti i ' + allClients.length + ' clienti')
-            + '</button>'
-            + '</div>'
-          : '';
-
-        return rows + toggleBtn;
-      })()}
+      <div id="dash-clients-list">${_buildClientsList(allClients, window._excludedClients||[], window._showAllClients||false, filtered)}</div>
     </div>
 
     <div class="card">
@@ -2517,6 +2535,100 @@ if (window._showAllClients === undefined) window._showAllClients = false;
       <div class="chart-wrap" style="height:200px"><canvas id="chart-pie"></canvas></div>
     </div>
   `;
+}
+
+// Aggiorna KPI e lista clienti senza ricostruire i filtri (eseguita al toggle esclusione)
+function _updateDashExclude() {
+  if (currentTab !== 'dashboard') { render(); return; }
+  const rows = allRows();
+  if (!rows.length) return;
+
+  // Ricalcola filtered con lo stesso stato corrente
+  const df      = window._df || { anni:[], mesi:[], quick:null };
+  const dfComm  = window._dfComm || [];
+  const rowsBase = dfComm.length ? rows.filter(r => dfComm.includes(r.commerciale||'')) : rows;
+  let filtered;
+  if (df.quick) {
+    const now  = new Date();
+    const m    = parseInt(df.quick);
+    const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const cutoff = new Date(now.getFullYear(), now.getMonth() - m, 1);
+    filtered = rowsBase.filter(r => r.dataObj && r.dataObj >= cutoff && r.dataObj < startOfCurrentMonth);
+  } else {
+    let byAnno = df.anni.length ? rowsBase.filter(r => r.dataObj && df.anni.includes(r.dataObj.getFullYear())) : rowsBase;
+    filtered = df.mesi.length ? byAnno.filter(r => r.dataObj && df.mesi.includes(r.dataObj.getMonth())) : byAnno;
+  }
+
+  // Applica esclusioni ai filtered per KPI
+  const excl         = window._excludedClients || [];
+  const filteredNoEx = filtered.filter(r => !excl.includes(r.cliente));
+  const totalF       = filteredNoEx.reduce((s,r) => s + r.importo, 0);
+  const clientiAtt   = new Set(filteredNoEx.map(r => r.cliente)).size;
+  const clientiTot   = new Set(rows.map(r => r.cliente)).size;
+
+  // Aggiorna KPI
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  set('dash-kpi-fatturato',     fmtK(totalF));
+  set('dash-kpi-fatturato-sub', fmtEur(totalF));
+  set('dash-kpi-fatture',       filteredNoEx.length);
+  set('dash-kpi-clienti',       clientiAtt);
+  set('dash-kpi-clienti-sub',   'totale: ' + clientiTot);
+  set('dash-kpi-media',         fmtK(filteredNoEx.length ? totalF / filteredNoEx.length : 0));
+
+  // Aggiorna lista clienti
+  const listEl = document.getElementById('dash-clients-list');
+  if (listEl) {
+    const byClient = {};
+    filtered.forEach(r => { byClient[r.cliente] = (byClient[r.cliente]||0) + r.importo; });
+    const allClients = Object.entries(byClient).sort((a,b) => b[1]-a[1]);
+    listEl.innerHTML = _buildClientsList(allClients, excl, window._showAllClients || false, filtered);
+  }
+
+  // Aggiorna badge "X esclusi"
+  const badgeWrap = document.getElementById('dash-excl-badge');
+  if (badgeWrap) {
+    badgeWrap.innerHTML = excl.length
+      ? '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#e05c5c;background:rgba(224,92,92,0.15);border:1.5px solid rgba(224,92,92,0.45);border-radius:20px;padding:3px 10px">✕ ' + excl.length + ' esclus' + (excl.length===1?'o':'i') + '</span>'
+        + '<button onclick="window._excludedClients=[];markUnsaved();save();_updateDashExclude()" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;border:1.5px solid rgba(76,175,130,0.55);background:rgba(76,175,130,0.12);color:#4caf82;cursor:pointer">↺ Ripristina tutti</button>'
+      : '';
+  }
+
+  // Aggiorna grafico mensile
+  _refreshBarChart(filteredNoEx);
+}
+
+function _refreshBarChart(filteredRows) {
+  const chart = chartInstances['chart-bar'];
+  if (!chart) return;
+  const MESI = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+  const df    = window._df || {};
+  const dfComm = window._dfComm || [];
+  const anniSel = df.anni || [];
+
+  if (anniSel.length >= 2 && window._dfCompare) {
+    // Modalità confronto: aggiorna dataset per anno
+    anniSel.forEach((anno, i) => {
+      const ds    = chart.data.datasets[i];
+      if (!ds) return;
+      const rowsA = filteredRows.filter(r => r.dataObj && r.dataObj.getFullYear() === anno);
+      const mesi  = chart.data.labels.map(l => parseInt(l) - 1);
+      ds.data = mesi.map(m => rowsA.filter(r => r.dataObj.getMonth() === m).reduce((s,r) => s+r.importo, 0));
+    });
+  } else {
+    // Modalità normale: unico dataset
+    const ds = chart.data.datasets[0];
+    if (!ds) return;
+    const monthly = {};
+    filteredRows.forEach(r => {
+      if (!r.dataObj) return;
+      const k = r.dataObj.getFullYear() + '-' + String(r.dataObj.getMonth()+1).padStart(2,'0');
+      monthly[k] = (monthly[k]||0) + r.importo;
+    });
+    const months = Object.keys(monthly).sort().slice(-24);
+    chart.data.labels   = months.map(k => { const [y,m] = k.split('-'); return MESI[parseInt(m)-1] + ' ' + y; });
+    ds.data = months.map(k => monthly[k]||0);
+  }
+  chart.update('none');
 }
 
 function afterRender() {
@@ -2821,6 +2933,18 @@ function _buildClientiList() {
     if (!byClient[r.cliente].ultima || (r.dataObj && r.dataObj > byClient[r.cliente].ultima)) byClient[r.cliente].ultima = r.dataObj;
   });
 
+  // Commerciale principale per ogni cliente (il più frequente)
+  const commsAll = [...new Set(rows.map(r=>r.commerciale||'').filter(Boolean).filter(c=>c!=='—'))].sort();
+  const getMainComm = nome => {
+    const counts = {};
+    (byClient[nome]?.fatture || []).forEach(f => {
+      if (f.commerciale && f.commerciale !== '—') counts[f.commerciale] = (counts[f.commerciale]||0) + 1;
+    });
+    const entries = Object.entries(counts);
+    if (!entries.length) return null;
+    return entries.sort((a,b) => b[1]-a[1])[0][0];
+  };
+
   let list = Object.entries(byClient).sort((a,b) => b[1].totale - a[1].totale);
 
   // Filtra per commerciale selezionato
@@ -2866,8 +2990,16 @@ function _buildClientiList() {
       <div onclick="toggleClient(this.dataset.nome)" data-nome="${esc(nome)}"  style="padding:16px;cursor:pointer;-webkit-tap-highlight-color:transparent">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
           <div style="flex:1;padding-right:12px">
-            <div style="font-weight:600;font-size:14px">${nomeHtml}</div>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${isOpen ? fattureSorted.length + ' fatt. (raggrupp.)' : d.fatture.length + ' righe'} • Ultima: ${d.ultima ? fmtDate(d.ultima) : '—'}</div>
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:3px">
+              <span style="font-weight:600;font-size:14px">${nomeHtml}</span>
+              ${(() => {
+                const comm = getMainComm(nome);
+                if (!comm) return '';
+                const col = commColor(commsAll, comm);
+                return '<span style="display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px;background:' + col.bg.replace('0.18','0.25') + ';border:1px solid ' + col.border + '88;color:' + col.text + ';white-space:nowrap">' + esc(comm) + '</span>';
+              })()}
+            </div>
+            <div style="font-size:11px;color:var(--text-muted)">${isOpen ? fattureSorted.length + ' fatt. (raggrupp.)' : d.fatture.length + ' righe'} • Ultima: ${d.ultima ? fmtDate(d.ultima) : '—'}</div>
           </div>
           <div style="text-align:right;flex-shrink:0">
             <div class="amount" style="font-size:16px">${fmtEur(d.totale)}</div>
@@ -3041,7 +3173,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 22:08</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 22:26</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -3701,7 +3833,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260222-220857';
+const APP_VERSION = '20260222-222659';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
