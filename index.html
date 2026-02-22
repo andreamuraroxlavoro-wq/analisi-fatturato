@@ -806,7 +806,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.82);color:rgba(255,255,255,0.82);font-weight:700">Andrea Muraro</strong></div>
-          <div id="header-version">v 2026.02.22 - 23:36</div>
+          <div id="header-version">v 2026.02.22 - 23:43</div>
         </div>
       </div>
       <div class="header-actions">
@@ -2826,87 +2826,162 @@ function _buildMonthlyChart(filteredRows, allRows_, filteredAll) {
       const ctx2  = chart.ctx;
       const xAxis = chart.scales.x;
       const yAxis = chart.scales.y;
-      const RED   = 'rgba(255, 75, 75, 0.92)';
-      const GAP   = 10;   // distanza orizzontale freccia dalla linea
-      const ARROW_Y = yAxis.top + 14; // Y della freccia e testo
+      const chartH = yAxis.bottom - yAxis.top;
+      const chartTop = yAxis.top;
+      const chartBot = yAxis.bottom;
 
       ctx2.save();
+
       indices.forEach(idx => {
         const x0 = xAxis.getPixelForValue(idx - 1);
         const x1 = xAxis.getPixelForValue(idx);
-        const x  = (x0 + x1) / 2;
+        const xMid = (x0 + x1) / 2;
 
-        // ── Linea verticale tratteggiata ──────────────────────
+        const prevLabel = months[idx - 1] ? months[idx - 1].split('-')[0] : '';
+        const nextLabel = months[idx]     ? months[idx].split('-')[0]     : '';
+        const prevShort = prevLabel ? "'" + prevLabel.slice(2) : '';
+        const nextShort = nextLabel ? "'" + nextLabel.slice(2) : '';
+
+        // ── 1. Banda sfumata laterale (glow orizzontale) ──────
+        const bandW = 18;
+        const gradBand = ctx2.createLinearGradient(xMid - bandW, 0, xMid + bandW, 0);
+        gradBand.addColorStop(0,   'rgba(220, 50, 50, 0)');
+        gradBand.addColorStop(0.4, 'rgba(220, 50, 50, 0.08)');
+        gradBand.addColorStop(0.5, 'rgba(220, 50, 50, 0.18)');
+        gradBand.addColorStop(0.6, 'rgba(220, 50, 50, 0.08)');
+        gradBand.addColorStop(1,   'rgba(220, 50, 50, 0)');
+        ctx2.fillStyle = gradBand;
+        ctx2.fillRect(xMid - bandW, chartTop, bandW * 2, chartH);
+
+        // ── 2. Linea centrale con glow a strati ───────────────
+        // Strato glow esterno
+        ctx2.save();
+        ctx2.shadowColor   = 'rgba(255, 80, 80, 0.6)';
+        ctx2.shadowBlur    = 8;
         ctx2.beginPath();
-        ctx2.setLineDash([4, 4]);
-        ctx2.strokeStyle = RED;
-        ctx2.lineWidth = 1.5;
-        ctx2.moveTo(x, yAxis.top + 28); // inizia sotto le etichette
-        ctx2.lineTo(x, yAxis.bottom);
+        ctx2.setLineDash([]);
+        ctx2.strokeStyle = 'rgba(255, 100, 100, 0.25)';
+        ctx2.lineWidth   = 4;
+        ctx2.moveTo(xMid, chartTop + 36);
+        ctx2.lineTo(xMid, chartBot);
+        ctx2.stroke();
+        ctx2.restore();
+
+        // Linea tratteggiata principale
+        ctx2.beginPath();
+        ctx2.setLineDash([5, 5]);
+        ctx2.strokeStyle = 'rgba(255, 75, 75, 0.85)';
+        ctx2.lineWidth   = 1.5;
+        ctx2.moveTo(xMid, chartTop + 36);
+        ctx2.lineTo(xMid, chartBot);
         ctx2.stroke();
         ctx2.setLineDash([]);
 
-        const prevYear = months[idx - 1] ? "'" + months[idx - 1].split('-')[0].slice(2) : '';
-        const newYear  = months[idx]     ? "'" + months[idx].split('-')[0].slice(2)     : '';
+        // ── 3. Pill sinistra (anno vecchio) ───────────────────
+        if (prevShort) {
+          const PAD_X = 8, PAD_Y = 5;
+          ctx2.font = 'bold 11px system-ui, sans-serif';
+          const tw  = ctx2.measureText(prevShort).width;
+          const pw  = tw + PAD_X * 2;
+          const ph  = 18;
+          const px  = xMid - pw - 8;
+          const py  = chartTop + 8;
+          const r   = ph / 2;
 
-        ctx2.font      = 'bold 10px sans-serif';
-        ctx2.fillStyle = RED;
-
-        // ── Freccia sinistra (← anno precedente) ─────────────
-        // testo a destra della punta freccia, allineato a destra della linea
-        if (prevYear) {
-          const tw    = ctx2.measureText(prevYear).width;
-          const textX = x - GAP - 6;         // testo finisce GAP+6 px a sinistra di x
-          const arrowX = x - GAP;             // punta della freccia
-
-          // testo
-          ctx2.textAlign = 'right';
-          ctx2.fillText(prevYear, textX + tw, ARROW_Y + 4);
-
-          // freccia ←  (punta a sinistra)
+          // Sfondo pill con gradiente
+          const pillGrad = ctx2.createLinearGradient(px, py, px + pw, py);
+          pillGrad.addColorStop(0, 'rgba(40, 18, 18, 0.92)');
+          pillGrad.addColorStop(1, 'rgba(60, 20, 20, 0.92)');
           ctx2.beginPath();
-          ctx2.moveTo(arrowX, ARROW_Y);
-          ctx2.lineTo(arrowX - 6, ARROW_Y - 4);
-          ctx2.lineTo(arrowX - 6, ARROW_Y + 4);
+          ctx2.moveTo(px + r, py);
+          ctx2.arcTo(px + pw, py, px + pw, py + ph, r);
+          ctx2.arcTo(px + pw, py + ph, px, py + ph, r);
+          ctx2.arcTo(px, py + ph, px, py, r);
+          ctx2.arcTo(px, py, px + pw, py, r);
           ctx2.closePath();
+          ctx2.fillStyle = pillGrad;
           ctx2.fill();
 
-          // lineetta orizzontale dal testo alla freccia
-          ctx2.beginPath();
-          ctx2.lineWidth = 1.2;
-          ctx2.strokeStyle = RED;
-          ctx2.moveTo(textX + tw + 2, ARROW_Y);
-          ctx2.lineTo(arrowX - 6, ARROW_Y);
+          // Bordo pill con glow
+          ctx2.save();
+          ctx2.shadowColor = 'rgba(255, 80, 80, 0.5)';
+          ctx2.shadowBlur  = 6;
+          ctx2.strokeStyle = 'rgba(220, 60, 60, 0.9)';
+          ctx2.lineWidth   = 1;
           ctx2.stroke();
+          ctx2.restore();
+
+          // Testo
+          ctx2.fillStyle  = 'rgba(255, 140, 140, 1)';
+          ctx2.textAlign  = 'center';
+          ctx2.textBaseline = 'middle';
+          ctx2.fillText(prevShort, px + pw / 2, py + ph / 2);
+
+          // Freccia → verso la linea
+          const arrowTip = xMid - 8;
+          const arrowY   = py + ph / 2;
+          ctx2.beginPath();
+          ctx2.fillStyle = 'rgba(255, 100, 100, 0.85)';
+          ctx2.moveTo(arrowTip,     arrowY);
+          ctx2.lineTo(arrowTip - 5, arrowY - 3.5);
+          ctx2.lineTo(arrowTip - 5, arrowY + 3.5);
+          ctx2.closePath();
+          ctx2.fill();
         }
 
-        // ── Freccia destra (→ anno successivo) ───────────────
-        if (newYear) {
-          const arrowX = x + GAP;             // base della freccia
+        // ── 4. Pill destra (anno nuovo) ───────────────────────
+        if (nextShort) {
+          const PAD_X = 8, PAD_Y = 5;
+          ctx2.font = 'bold 11px system-ui, sans-serif';
+          const tw  = ctx2.measureText(nextShort).width;
+          const pw  = tw + PAD_X * 2;
+          const ph  = 18;
+          const px  = xMid + 8;
+          const py  = chartTop + 8;
+          const r   = ph / 2;
 
-          // freccia → (punta a destra)
+          // Sfondo pill
+          const pillGrad = ctx2.createLinearGradient(px, py, px + pw, py);
+          pillGrad.addColorStop(0, 'rgba(60, 20, 20, 0.92)');
+          pillGrad.addColorStop(1, 'rgba(40, 18, 18, 0.92)');
           ctx2.beginPath();
-          ctx2.fillStyle = RED;
-          ctx2.moveTo(arrowX + 6, ARROW_Y);
-          ctx2.lineTo(arrowX, ARROW_Y - 4);
-          ctx2.lineTo(arrowX, ARROW_Y + 4);
+          ctx2.moveTo(px + r, py);
+          ctx2.arcTo(px + pw, py, px + pw, py + ph, r);
+          ctx2.arcTo(px + pw, py + ph, px, py + ph, r);
+          ctx2.arcTo(px, py + ph, px, py, r);
+          ctx2.arcTo(px, py, px + pw, py, r);
           ctx2.closePath();
+          ctx2.fillStyle = pillGrad;
           ctx2.fill();
 
-          // testo
-          ctx2.textAlign = 'left';
-          ctx2.fillStyle = RED;
-          ctx2.fillText(newYear, arrowX + 8, ARROW_Y + 4);
-
-          // lineetta orizzontale
-          ctx2.beginPath();
-          ctx2.lineWidth = 1.2;
-          ctx2.strokeStyle = RED;
-          ctx2.moveTo(arrowX + 6, ARROW_Y);
-          ctx2.lineTo(arrowX + 8 - 2, ARROW_Y);
+          // Bordo
+          ctx2.save();
+          ctx2.shadowColor = 'rgba(255, 80, 80, 0.5)';
+          ctx2.shadowBlur  = 6;
+          ctx2.strokeStyle = 'rgba(220, 60, 60, 0.9)';
+          ctx2.lineWidth   = 1;
           ctx2.stroke();
+          ctx2.restore();
+
+          // Testo
+          ctx2.fillStyle    = 'rgba(255, 140, 140, 1)';
+          ctx2.textAlign    = 'center';
+          ctx2.textBaseline = 'middle';
+          ctx2.fillText(nextShort, px + pw / 2, py + ph / 2);
+
+          // Freccia ← verso la linea
+          const arrowTip = xMid + 8;
+          const arrowY   = py + ph / 2;
+          ctx2.beginPath();
+          ctx2.fillStyle = 'rgba(255, 100, 100, 0.85)';
+          ctx2.moveTo(arrowTip,     arrowY);
+          ctx2.lineTo(arrowTip + 5, arrowY - 3.5);
+          ctx2.lineTo(arrowTip + 5, arrowY + 3.5);
+          ctx2.closePath();
+          ctx2.fill();
         }
       });
+
       ctx2.restore();
     }
   };
@@ -3270,7 +3345,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 23:36</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 23:43</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -3930,7 +4005,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260222-233604';
+const APP_VERSION = '20260222-234311';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
