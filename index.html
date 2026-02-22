@@ -683,6 +683,17 @@
     font-weight: 700;
     box-shadow: 0 0 14px rgba(201,168,76,0.45);
   }
+  @keyframes pulse-dot {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50%       { transform: scale(1.4); opacity: 0.7; }
+  }
+  #btn-save-dati.unsaved {
+    border-color: #ff4757;
+    background: rgba(255,71,87,0.15);
+    color: #ff4757;
+    box-shadow: 0 0 18px rgba(255,71,87,0.35);
+  }
+  #btn-save-dati.unsaved #save-dati-dot { display:block !important; }
   .filter-divider { height: 1px; background: var(--border); margin: 10px 0; }
   .compare-btn {
     display: inline-flex;
@@ -782,17 +793,14 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.85);color:rgba(255,255,255,0.85)">Andrea Muraro</strong></div>
-          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 10:33</div>
+          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 13:08</div>
         </div>
       </div>
       <div class="header-actions">
-        <button class="btn-session btn-load-session" onclick="loadSession()" title="Carica file .html o .json salvato">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 15v4a2 2 0 002 2h14a2 2 0 002-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-          Carica File (.html / .json)
-        </button>
-        <button class="btn-session btn-save-session" id="btn-save" onclick="saveSession()" title="Salva file .html con dati incorporati">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 15v4a2 2 0 002 2h14a2 2 0 002-2v-4M7 10l5-5 5 5M12 5v10"/></svg>
-          Salva File (.html)
+        <button id="btn-save-dati" onclick="onSaveDatiClick()" title="Salva Dati" style="display:inline-flex;align-items:center;gap:7px;padding:10px 18px;border-radius:14px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s;border:2px solid #4caf82;background:rgba(76,175,130,0.15);color:#4caf82;position:relative">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          Salva Dati
+          <span id="save-dati-dot" style="display:none;position:absolute;top:-4px;right:-4px;width:10px;height:10px;border-radius:50%;background:#ff4757;border:2px solid var(--surface);animation:pulse-dot 1.5s ease-in-out infinite"></span>
         </button>
         <button id="import-btn" onclick="openImportFlow()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
@@ -864,9 +872,16 @@ let _unsavedChanges = false;
 
 // ── SETTINGS ──────────────────────────────────────────────
 let SETTINGS = {
-  fileName: 'vendite-sessione',
-  autoSave: false
+  fileName:        'DB_Analisi_Fatturato_PRO',
+  autoSave:        false,
+  saveMethod:      '',       // 'gdrive' | 'dropbox' | 'onedrive' | 'local' | ''
+  gdrive_token:    '',
+  dropbox_token:   '',
+  onedrive_token:  '',
+  fileCounter:     1         // progressivo per i nuovi file
 };
+// Handle cartella locale (Chrome File System API) — non serializzabile, tenuto in memoria
+let _dirHandle = null;
 (function loadSettings() {
   try {
     const s = localStorage.getItem('vendite_pro_settings');
@@ -880,10 +895,14 @@ function saveSettings() {
 function markUnsaved() {
   _unsavedChanges = true;
   updateSaveBtn();
+  const b = document.getElementById('btn-save-dati');
+  if (b) b.classList.add('unsaved');
 }
 function markSaved() {
   _unsavedChanges = false;
   updateSaveBtn();
+  const b = document.getElementById('btn-save-dati');
+  if (b) b.classList.remove('unsaved');
 }
 
 function showUnsavedModal(onDiscard) {
@@ -1000,6 +1019,445 @@ function saveSession() {
 
 function loadSession() {
   document.getElementById('session-input').click();
+}
+
+// ── Salva Dati: gestisce modalità e dialogo ───────────────────────────────
+function onSaveDatiClick() {
+  if (!DB.datasets.length) {
+    toast('Nessun dato da salvare — importa prima un file Excel', 'error');
+    return;
+  }
+  const method = SETTINGS.saveMethod;
+  if (!method) {
+    // Nessun percorso configurato: rimanda alle impostazioni
+    showSaveMethodModal();
+    return;
+  }
+  // Chiedi: sovrascrivi o nuovo file?
+  showSaveOptionsModal(method);
+}
+
+function showSaveMethodModal() {
+  const el = document.createElement('div');
+  el.id = 'save-method-overlay';
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);z-index:99999;display:flex;align-items:flex-end;justify-content:center';
+  el.innerHTML = `
+    <div style="background:#1a1f2a;border:2px solid rgba(226,184,74,0.4);border-radius:20px 20px 0 0;padding:28px 24px 44px;width:100%;max-width:480px;animation:slideUpSheet 0.25s cubic-bezier(.2,.9,.4,1)">
+      <div style="font-size:22px;text-align:center;margin-bottom:6px">⚙️</div>
+      <div style="font-size:17px;font-weight:800;color:#fff;text-align:center;margin-bottom:6px">Percorso di salvataggio non impostato</div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.5);text-align:center;margin-bottom:22px">Vai in Impostazioni per scegliere dove salvare i dati</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button onclick="document.getElementById('save-method-overlay').remove();showTab('settings')" style="width:100%;padding:14px;border-radius:14px;font-family:sans-serif;font-size:14px;font-weight:700;cursor:pointer;background:linear-gradient(135deg,#e2b84a,#c9853a);border:none;color:#000">
+          ⚙️ Vai alle Impostazioni
+        </button>
+        <button onclick="document.getElementById('save-method-overlay').remove()" style="width:100%;padding:14px;border-radius:14px;font-family:sans-serif;font-size:14px;font-weight:600;cursor:pointer;background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6)">
+          Annulla
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  el.addEventListener('click', e => { if (e.target === el) el.remove(); });
+}
+
+function showSaveOptionsModal(method) {
+  const base   = 'DB_Analisi_Fatturato_PRO';
+  const pad    = n => String(n).padStart(3,'0');
+  const nameOver = base + '_' + pad(SETTINGS.fileCounter || 1) + '.json';
+  const nameNew  = base + '_' + pad((SETTINGS.fileCounter || 1) + 1) + '.json';
+  const el = document.createElement('div');
+  el.id = 'save-opts-overlay';
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);z-index:99999;display:flex;align-items:flex-end;justify-content:center';
+  el.innerHTML = `
+    <div style="background:#1a1f2a;border:2px solid rgba(226,184,74,0.4);border-radius:20px 20px 0 0;padding:28px 24px 44px;width:100%;max-width:480px;animation:slideUpSheet 0.25s cubic-bezier(.2,.9,.4,1)">
+      <div style="font-size:22px;text-align:center;margin-bottom:6px">💾</div>
+      <div style="font-size:17px;font-weight:800;color:#fff;text-align:center;margin-bottom:6px">Salva Dati</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.4);text-align:center;margin-bottom:22px">
+        ${methodLabel(method)} · ${DB.datasets.length} dataset
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button onclick="doSaveDati('overwrite');document.getElementById('save-opts-overlay').remove()" style="width:100%;padding:14px;border-radius:14px;font-family:sans-serif;font-size:14px;font-weight:700;cursor:pointer;background:rgba(226,184,74,0.15);border:2px solid rgba(226,184,74,0.5);color:#e2b84a">
+          ♻️ Sovrascrivi file attuale
+          <div style="font-size:11px;font-weight:500;opacity:0.7;margin-top:3px">${nameOver}</div>
+        </button>
+        <button onclick="doSaveDati('new');document.getElementById('save-opts-overlay').remove()" style="width:100%;padding:14px;border-radius:14px;font-family:sans-serif;font-size:14px;font-weight:700;cursor:pointer;background:rgba(76,175,130,0.15);border:2px solid rgba(76,175,130,0.5);color:#4caf82">
+          ✨ Crea nuovo file
+          <div style="font-size:11px;font-weight:500;opacity:0.7;margin-top:3px">${nameNew}</div>
+        </button>
+        <button onclick="document.getElementById('save-opts-overlay').remove()" style="width:100%;padding:14px;border-radius:14px;font-family:sans-serif;font-size:14px;font-weight:600;cursor:pointer;background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6)">
+          Annulla
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  el.addEventListener('click', e => { if (e.target === el) el.remove(); });
+}
+
+function methodLabel(m) {
+  return { gdrive:'Google Drive', dropbox:'Dropbox', onedrive:'OneDrive', local:'Download locale' }[m] || m;
+}
+
+function doSaveDati(mode) {
+  if (mode === 'new') {
+    SETTINGS.fileCounter = (SETTINGS.fileCounter || 1) + 1;
+    saveSettings();
+  }
+  const method = SETTINGS.saveMethod;
+  const pad    = n => String(n).padStart(3,'0');
+  const fname  = 'DB_Analisi_Fatturato_PRO_' + pad(SETTINGS.fileCounter || 1) + '.json';
+  const json   = JSON.stringify(buildPayload(), null, 2);
+  const blob   = new Blob([json], { type: 'application/json' });
+
+  if (method === 'local') {
+    _saveLocal(blob, fname);
+    return;
+  }
+  if (method === 'gdrive')   { saveToGDrive(blob, fname);   return; }
+  if (method === 'dropbox')  { saveToDropbox(blob, fname);  return; }
+  if (method === 'onedrive') { saveToOneDrive(blob, fname); return; }
+}
+
+// ── Salvataggio locale: Chrome (File System API) o Safari (Download) ─────
+async function _saveLocal(blob, fname) {
+  // Chrome/Edge: usa il directory handle se disponibile
+  if (_dirHandle) {
+    try {
+      const fileHandle = await _dirHandle.getFileHandle(fname, { create: true });
+      const writable   = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      save(); markSaved();
+      toast('\u2713 ' + fname + ' salvato in: ' + _dirHandle.name);
+      renderSavePathSection(); // aggiorna stato
+      return;
+    } catch(e) {
+      // Permesso scaduto — chiedi di riselezionare la cartella
+      _dirHandle = null;
+      renderSavePathSection();
+      toast('Permesso cartella scaduto — riseleziona la cartella', 'error');
+      return;
+    }
+  }
+  // Fallback: download standard (Safari e tutti i browser senza dir handle)
+  _downloadBlob(blob, fname);
+  save(); markSaved();
+  toast('\u2713 ' + fname + ' scaricato nella cartella Download');
+}
+
+function _downloadBlob(blob, fname) {
+  const url = URL.createObjectURL(blob);
+  const a   = document.createElement('a');
+  a.href = url; a.download = fname;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+}
+
+// ── Scegli cartella (Chrome File System API) ─────────────────────────────
+async function pickLocalFolder() {
+  if (!window.showDirectoryPicker) {
+    toast('Selezione cartella non supportata su Safari — i file verranno scaricati nella cartella Download', 'error');
+    return;
+  }
+  try {
+    const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    _dirHandle = handle;
+    SETTINGS.localFolderName = handle.name;
+    saveSettings();
+    renderSavePathSection();
+    toast('\u2713 Cartella impostata: ' + handle.name);
+  } catch(e) {
+    if (e.name !== 'AbortError') {
+      toast('Errore selezione cartella: ' + e.message, 'error');
+    }
+  }
+}
+
+// ── Impostazioni metodo salvataggio ─────────────────────────────────────
+function setSaveMethod(m) {
+  SETTINGS.saveMethod = m;
+  if (!SETTINGS.fileCounter) SETTINGS.fileCounter = 1;
+  saveSettings();
+  renderSettings();
+  renderSavePathSection();
+  toast('\u2713 Metodo impostato: ' + methodLabel(m));
+}
+
+function renderSavePathSection() {
+  const el = document.getElementById('save-path-section');
+  if (!el) return;
+  const m       = SETTINGS.saveMethod;
+  const counter = SETTINGS.fileCounter || 1;
+  const pad     = n => String(n).padStart(3,'0');
+  const fname   = 'DB_Analisi_Fatturato_PRO_' + pad(counter) + '.json';
+
+  const methods = [
+    { id:'gdrive',   label:'Google Drive', color:'#4285f4',
+      icon:'<svg viewBox="0 0 87.3 78" width="22" height="22"><path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H1.1c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="M43.65 25L29.9 1.2C28.55 2 27.4 3.1 26.6 4.5L1.2 49.5C.4 50.9 0 52.45 0 54h27.5z" fill="#00ac47"/><path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 11.5z" fill="#ea4335"/><path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="M59.8 54H27.5L13.75 77.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="M73.4 27.5l-12.8-22.2C59.8 3.9 58.65 2.8 57.3 2L43.55 25 59.7 54h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>' },
+    { id:'dropbox',  label:'Dropbox',      color:'#0061ff',
+      icon:'<svg viewBox="0 0 43.1 40.5" width="22" height="22"><path fill="#0061ff" d="M12.8 0L0 8.2l12.8 8.2 12.8-8.2zM38.3 0L25.5 8.2l12.8 8.2 12.8-8.2zM0 24.7l12.8 8.2 12.8-8.2-12.8-8.2zM38.3 16.5l-12.8 8.2 12.8 8.2 12.8-8.2zM12.8 28.1l12.8 8.2 12.8-8.2-12.8-8.2z"/></svg>' },
+    { id:'onedrive', label:'OneDrive',     color:'#0078d4',
+      icon:'<svg viewBox="0 0 32 32" width="22" height="22"><path d="M19.2 12.8A7.2 7.2 0 006.4 16H6a6 6 0 000 12h20a5 5 0 000-10 4.98 4.98 0 00-1.1.12A7.2 7.2 0 0019.2 12.8z" fill="#0078d4"/></svg>' },
+    { id:'local',    label:'Download',     color:'#e2b84a',
+      icon:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#e2b84a" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>' }
+  ];
+
+  const tilesHTML = methods.map(mt => {
+    const active = m === mt.id;
+    const borderCol = active ? mt.color : 'rgba(255,255,255,0.1)';
+    const bgCol     = active ? 'rgba(' + (mt.color==='#4285f4'?'66,133,244':'rgba') + ',0.12)' : 'rgba(255,255,255,0.04)';
+    const textCol   = active ? mt.color : 'rgba(255,255,255,0.45)';
+    const bg = active ? ('rgba(' + (mt.color==='#4285f4'?'66,133,244':mt.color==='#0061ff'?'0,97,255':mt.color==='#0078d4'?'0,120,212':'226,184,74') + ',0.13)') : 'rgba(255,255,255,0.04)';
+    return '<button onclick="setSaveMethod(&quot;' + mt.id + '&quot;)" style="padding:14px 8px;border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:7px;transition:all 0.2s;background:' + bg + ';border:2px solid ' + borderCol + ';color:' + textCol + ';letter-spacing:0.3px">' + mt.icon + mt.label + '</button>';
+  }).join('');
+
+  // Token input per cloud
+  const isChrome = !!(window.chrome) || ('showDirectoryPicker' in window);
+  const tokenHTML = (m && m !== 'local') ? (() => {
+    if (m === 'gdrive') {
+      const connected = _gdriveTokenValid();
+      const expiry    = SETTINGS.gdrive_expiry ? new Date(SETTINGS.gdrive_expiry).toLocaleTimeString('it-IT', {hour:'2-digit',minute:'2-digit'}) : '';
+      return '<div style="margin-top:4px;background:rgba(255,255,255,0.04);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,0.08)">' +
+        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">' +
+        '<div style="width:36px;height:36px;border-radius:10px;background:rgba(66,133,244,0.15);display:flex;align-items:center;justify-content:center">' +
+        '<svg viewBox="0 0 87.3 78" width="20" height="20"><path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H1.1c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="M43.65 25L29.9 1.2C28.55 2 27.4 3.1 26.6 4.5L1.2 49.5C.4 50.9 0 52.45 0 54h27.5z" fill="#00ac47"/><path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 11.5z" fill="#ea4335"/><path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="M59.8 54H27.5L13.75 77.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="M73.4 27.5l-12.8-22.2C59.8 3.9 58.65 2.8 57.3 2L43.55 25 59.7 54h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>' +
+        '</div>' +
+        '<div>' +
+        '<div style="font-size:13px;font-weight:700;color:#fff">Google Drive</div>' +
+        '<div style="font-size:11px;color:' + (connected ? '#4caf82' : 'rgba(255,255,255,0.4)') + '">' +
+        (connected ? ('✓ Connesso · token valido fino alle ' + expiry) : '✗ Non connesso') +
+        '</div></div></div>' +
+        (connected
+          ? ('<div style="display:flex;gap:8px">' +
+             '<button onclick="connectGDrive()" style="flex:1;padding:11px;border-radius:10px;background:rgba(66,133,244,0.12);border:1.5px solid rgba(66,133,244,0.4);color:#4285f4;font-weight:700;font-size:12px;cursor:pointer">🔄 Rinnova token</button>' +
+             '<button onclick="disconnectGDrive()" style="padding:11px 14px;border-radius:10px;background:rgba(255,71,87,0.1);border:1.5px solid rgba(255,71,87,0.3);color:#ff4757;font-weight:700;font-size:12px;cursor:pointer">Disconnetti</button>' +
+             '</div>')
+          : '<button onclick="connectGDrive()" style="width:100%;padding:13px;border-radius:10px;background:linear-gradient(135deg,rgba(66,133,244,0.25),rgba(66,133,244,0.15));border:2px solid rgba(66,133,244,0.6);color:#4285f4;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>Connetti Google Drive</button>') +
+        '</div>';
+    }
+    // Dropbox e OneDrive: token manuale (per ora)
+    return '<div style="margin-top:4px;background:rgba(255,255,255,0.04);border-radius:12px;padding:14px;border:1px solid rgba(255,255,255,0.08)">' +
+      '<div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Token di accesso — ' + methodLabel(m) + '</div>' +
+      '<div style="display:flex;gap:8px">' +
+      '<input id="sett-token-input" type="password" placeholder="Incolla qui il tuo token..." value="' + (SETTINGS[m + '_token'] || '') + '" style="flex:1;padding:10px 12px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:13px">' +
+      '<button onclick="saveCloudToken()" style="padding:10px 14px;border-radius:10px;background:rgba(226,184,74,0.2);border:1.5px solid rgba(226,184,74,0.5);color:#e2b84a;font-weight:700;font-size:12px;cursor:pointer">Salva</button>' +
+      '</div>' +
+      '<div style="font-size:11px;color:rgba(255,255,255,0.3);margin-top:8px">' +
+      (m==='dropbox' ? '👉 Token da <a href="https://www.dropbox.com/developers/apps" target="_blank" style="color:#4caf82">Dropbox Developer</a>' :
+       '👉 Token da <a href="https://portal.azure.com" target="_blank" style="color:#4caf82">Azure Portal</a> · scope: Files.ReadWrite') +
+      '</div></div>';
+  })() : (m === 'local' ? (
+    '<div style="margin-top:4px;background:rgba(255,255,255,0.04);border-radius:12px;padding:14px;border:1px solid rgba(255,255,255,0.08)">' +
+    '<div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Cartella di destinazione</div>' +
+    (_dirHandle
+      ? ('<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
+         '<span style="font-size:18px">📁</span>' +
+         '<div><div style="font-size:13px;font-weight:700;color:#4caf82">' + (_dirHandle.name || 'Cartella selezionata') + '</div>' +
+         '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px">I file verranno salvati in questa cartella</div></div>' +
+         '</div>' +
+         '<button onclick="pickLocalFolder()" style="width:100%;padding:10px;border-radius:10px;background:rgba(255,255,255,0.06);border:1.5px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.5);font-size:12px;font-weight:600;cursor:pointer">🔄 Cambia cartella</button>')
+      : ('<div style="font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:10px">' +
+         (isChrome
+           ? 'Scegli la cartella dove salvare i file (Chrome supporta la selezione diretta)'
+           : 'Su Safari i file vengono scaricati nella cartella <strong style="color:#e2b84a">Download</strong> di default') +
+         '</div>' +
+         (isChrome
+           ? '<button onclick="pickLocalFolder()" style="width:100%;padding:12px;border-radius:10px;background:rgba(226,184,74,0.15);border:2px solid rgba(226,184,74,0.5);color:#e2b84a;font-size:13px;font-weight:700;cursor:pointer">📁 Scegli cartella di salvataggio</button>'
+           : '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;background:rgba(226,184,74,0.08);border:1px solid rgba(226,184,74,0.2)">' +
+             '<span style="font-size:18px">📥</span>' +
+             '<div style="font-size:12px;color:rgba(255,255,255,0.6)">I file verranno scaricati automaticamente nella cartella <strong style="color:#e2b84a">Download</strong></div>' +
+             '</div>'))) +
+    '</div>'
+  ) : '');
+
+  // Stato
+  const dot   = m ? '#4caf82' : '#ff4757';
+  const stato = m
+    ? ('Metodo: <strong style="color:rgba(255,255,255,0.8)">' + methodLabel(m) + '</strong>'
+       + (counter > 1 ? ' &nbsp;·&nbsp; File: <strong style="color:#e2b84a">' + fname + '</strong>' : ''))
+    : 'Nessun metodo — i dati non vengono salvati su file';
+
+  el.innerHTML =
+    '<div style="padding:0 18px 18px;display:flex;flex-direction:column;gap:12px">' +
+    '<div style="font-size:12px;color:rgba(255,255,255,0.4)">Scegli dove salvare il file <strong style="color:var(--gold)">DB_Analisi_Fatturato_PRO</strong></div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">' + tilesHTML + '</div>' +
+    tokenHTML +
+    '<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(255,255,255,0.4)">' +
+    '<span style="width:8px;height:8px;border-radius:50%;background:' + dot + ';flex-shrink:0"></span>' +
+    stato + '</div>' +
+    '</div>';
+}
+
+function saveCloudToken() {
+  const inp = document.getElementById('sett-token-input');
+  if (!inp) return;
+  const key = SETTINGS.saveMethod + '_token';
+  SETTINGS[key] = inp.value.trim();
+  saveSettings();
+  toast('\u2713 Token salvato');
+}
+
+// ── Google Drive OAuth2 ──────────────────────────────────────────────────
+const GDRIVE_CLIENT_ID = '817077810257-p66ufgge93l79ql4acjdejgb8ecgnc4c.apps.googleusercontent.com';
+const GDRIVE_SCOPE     = 'https://www.googleapis.com/auth/drive.file';
+
+function connectGDrive() {
+  // Apre popup OAuth Google
+  const redirectUri = window.location.origin + window.location.pathname;
+  const url = 'https://accounts.google.com/o/oauth2/v2/auth' +
+    '?client_id='    + encodeURIComponent(GDRIVE_CLIENT_ID) +
+    '&redirect_uri=' + encodeURIComponent(redirectUri) +
+    '&response_type=token' +
+    '&scope='        + encodeURIComponent(GDRIVE_SCOPE) +
+    '&prompt=select_account';
+
+  const popup = window.open(url, 'gdrive_oauth',
+    'width=500,height=650,top=' + Math.round((screen.height-650)/2) +
+    ',left=' + Math.round((screen.width-500)/2));
+
+  // Ascolta il redirect con il token
+  const timer = setInterval(() => {
+    try {
+      const pu = popup.location.href;
+      if (pu.includes('access_token=')) {
+        clearInterval(timer);
+        popup.close();
+        const params = new URLSearchParams(pu.split('#')[1] || pu.split('?')[1]);
+        const token  = params.get('access_token');
+        const expin  = parseInt(params.get('expires_in') || '3600');
+        if (token) {
+          SETTINGS.gdrive_token    = token;
+          SETTINGS.gdrive_expiry   = Date.now() + expin * 1000;
+          saveSettings();
+          renderSavePathSection();
+          toast('\u2713 Google Drive connesso! Token valido per ' + Math.round(expin/60) + ' minuti');
+        }
+      }
+    } catch(e) { /* cross-origin, aspetta */ }
+    if (!popup || popup.closed) clearInterval(timer);
+  }, 500);
+}
+
+function disconnectGDrive() {
+  SETTINGS.gdrive_token  = '';
+  SETTINGS.gdrive_expiry = 0;
+  saveSettings();
+  renderSavePathSection();
+  toast('Google Drive disconnesso');
+}
+
+function _gdriveTokenValid() {
+  return SETTINGS.gdrive_token && (!SETTINGS.gdrive_expiry || Date.now() < SETTINGS.gdrive_expiry);
+}
+
+function saveToGDrive(blob, fname) {
+  if (!_gdriveTokenValid()) {
+    // Token scaduto: mostra dialogo riconnessione
+    _showReconnectModal('Google Drive', connectGDrive, () => {
+      setTimeout(() => saveToGDrive(blob, fname), 2000);
+    });
+    return;
+  }
+  const token = SETTINGS.gdrive_token;
+  // Usa multipart upload per creare/aggiornare il file
+  blob.arrayBuffer().then(buf => {
+    const boundary = 'afp_boundary_' + Date.now();
+    const meta     = JSON.stringify({ name: fname, mimeType: 'application/json' });
+    const enc      = new TextEncoder();
+    const pre      = '--' + boundary + '\r\nContent-Type: application/json\r\n\r\n' + meta + '\r\n--' + boundary + '\r\nContent-Type: application/json\r\n\r\n';
+    const post     = '\r\n--' + boundary + '--';
+    const preBuf   = enc.encode(pre);
+    const postBuf  = enc.encode(post);
+    const combined = new Uint8Array(preBuf.length + buf.byteLength + postBuf.length);
+    combined.set(preBuf, 0);
+    combined.set(new Uint8Array(buf), preBuf.length);
+    combined.set(postBuf, preBuf.length + buf.byteLength);
+
+    return fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method:  'POST',
+      headers: {
+        Authorization: 'Bearer ' + token,
+        'Content-Type': 'multipart/related; boundary=' + boundary
+      },
+      body: combined
+    });
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.id) {
+      save(); markSaved();
+      toast('\u2713 Salvato su Google Drive: ' + fname);
+    } else if (data.error && data.error.code === 401) {
+      SETTINGS.gdrive_token = '';
+      saveSettings();
+      renderSavePathSection();
+      toast('Token Google Drive scaduto — riconnettiti', 'error');
+    } else {
+      toast('Errore Google Drive: ' + (data.error && data.error.message || JSON.stringify(data)), 'error');
+    }
+  })
+  .catch(e => toast('Errore rete: ' + e.message, 'error'));
+}
+
+function _showReconnectModal(service, connectFn, afterFn) {
+  const el = document.createElement('div');
+  el.className = 'reconnect-modal'; el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+  el.innerHTML = '<div style="background:#1a1f2a;border:2px solid rgba(226,184,74,0.4);border-radius:20px;padding:28px 24px;width:100%;max-width:380px;text-align:center">' +
+    '<div style="font-size:32px;margin-bottom:12px">🔄</div>' +
+    '<div style="font-size:17px;font-weight:800;color:#fff;margin-bottom:8px">Token ' + service + ' scaduto</div>' +
+    '<div style="font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:22px">Il token di accesso è scaduto. Riconnetti l&#39;account per continuare.</div>' +
+    '<div style="display:flex;flex-direction:column;gap:10px">' +
+    '<button id="_reconnect_btn" style="padding:14px;border-radius:14px;background:linear-gradient(135deg,#e2b84a,#c9853a);border:none;color:#000;font-weight:700;font-size:14px;cursor:pointer">Riconnetti ' + service + '</button>' +
+    '<button onclick="this.closest(".reconnect-modal").remove()" style="padding:14px;border-radius:14px;background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.5);font-size:14px;cursor:pointer">Annulla</button>' +
+    '</div></div>';
+  document.body.appendChild(el);
+  el.querySelector('#_reconnect_btn').onclick = () => {
+    el.remove();
+    connectFn();
+    if (afterFn) afterFn();
+  };
+}
+
+// ── Dropbox ──────────────────────────────────────────────────────────────
+function saveToDropbox(blob, fname) {
+  const token = SETTINGS.dropbox_token;
+  if (!token) { toast('Token Dropbox non configurato — vai in Impostazioni', 'error'); return; }
+  blob.arrayBuffer().then(buf => {
+    fetch('https://content.dropboxapi.com/2/files/upload', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + token,
+        'Content-Type': 'application/octet-stream',
+        'Dropbox-API-Arg': JSON.stringify({ path: '/Apps/AnalisiFatturatoPRO/' + fname, mode: 'overwrite', autorename: false })
+      },
+      body: buf
+    }).then(r => r.json()).then(data => {
+      if (data.id) {
+        save(); markSaved();
+        toast('\u2713 Salvato su Dropbox: ' + fname);
+      } else {
+        toast('Errore Dropbox: ' + (data.error_summary || 'token scaduto'), 'error');
+      }
+    }).catch(e => toast('Errore rete Dropbox: ' + e.message, 'error'));
+  });
+}
+
+// ── OneDrive ─────────────────────────────────────────────────────────────
+function saveToOneDrive(blob, fname) {
+  const token = SETTINGS.onedrive_token;
+  if (!token) { toast('Token OneDrive non configurato — vai in Impostazioni', 'error'); return; }
+  blob.arrayBuffer().then(buf => {
+    fetch('https://graph.microsoft.com/v1.0/me/drive/special/approot:/' + fname + ':/content', {
+      method: 'PUT',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: buf
+    }).then(r => r.json()).then(data => {
+      if (data.id) {
+        save(); markSaved();
+        toast('\u2713 Salvato su OneDrive: ' + fname);
+      } else {
+        toast('Errore OneDrive: ' + (data.error && data.error.message || 'token scaduto'), 'error');
+      }
+    }).catch(e => toast('Errore rete OneDrive: ' + e.message, 'error'));
+  });
 }
 
 function handleSessionFile(e) {
@@ -1229,7 +1687,7 @@ function render() {
   else if (currentTab === 'clienti') c.innerHTML = renderClienti();
   else if (currentTab === 'dati') c.innerHTML = renderDati();
   else if (currentTab === 'export') c.innerHTML = renderExport();
-  else if (currentTab === 'settings') c.innerHTML = renderSettings();
+  else if (currentTab === 'settings') { c.innerHTML = renderSettings(); renderSavePathSection(); }
   afterRender();
 }
 
@@ -2049,46 +2507,10 @@ function renderSettings() {
         <span class="section-label">⚙️ Impostazioni App</span>
       </div>
 
-      <!-- SALVATAGGIO SESSIONE -->
+      <!-- PERCORSO DI SALVATAGGIO DATI -->
       <div class="settings-section">
-        <div class="settings-section-title">💾 Salvataggio sessione</div>
-
-        <div class="settings-row" style="flex-direction:column;align-items:flex-start">
-          <div class="settings-row-info">
-            <div class="settings-row-label">Nome file</div>
-            <div class="settings-row-desc">Il file verrà salvato come <strong style="color:var(--gold)">${(SETTINGS.fileName||'vendite-sessione').replace(/[^a-zA-Z0-9_\-]/g,'_')}-AAAA-MM-GG.json</strong></div>
-          </div>
-          <div class="settings-input-row" style="width:100%">
-            <input class="settings-input" id="sett-filename"
-              type="text" placeholder="es. MiaAzienda"
-              value="${esc(SETTINGS.fileName||'vendite-sessione')}"
-              oninput="document.getElementById('sett-filename-preview').textContent=(this.value||'vendite-sessione').replace(/[^a-zA-Z0-9_\\-]/g,'_')+'-${new Date().toISOString().slice(0,10)}.json'">
-            <button class="settings-save-btn" style="width:auto;padding:11px 18px;margin-top:0;font-size:13px"
-              onclick="SETTINGS.fileName=document.getElementById('sett-filename').value.trim()||'vendite-sessione';saveSettings();toast('✓ Nome file aggiornato');">
-              Salva
-            </button>
-          </div>
-          <div id="sett-filename-preview" style="font-size:11px;color:var(--text-muted);margin-top:6px;padding-left:2px">
-            ${(SETTINGS.fileName||'vendite-sessione').replace(/[^a-zA-Z0-9_\-]/g,'_')}-${new Date().toISOString().slice(0,10)}.json
-          </div>
-        </div>
-
-        <div class="settings-row">
-          <div class="settings-row-info">
-            <div class="settings-row-label">Salvataggio automatico</div>
-            <div class="settings-row-desc">Scarica automaticamente il file .json dopo ogni importazione Excel, senza dover premere Salva</div>
-          </div>
-          <label class="toggle-wrap">
-            <input type="checkbox" id="sett-autosave" ${SETTINGS.autoSave ? 'checked' : ''}
-              onchange="SETTINGS.autoSave=this.checked;saveSettings();
-                document.getElementById('autosave-status').textContent=this.checked?'Attivo':'Non attivo';
-                document.getElementById('autosave-status').style.color=this.checked?'#4caf82':'var(--text-muted)';">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div style="padding:0 18px 14px;margin-top:-6px">
-          <span id="autosave-status" style="font-size:11px;font-weight:600;color:${SETTINGS.autoSave?'#4caf82':'var(--text-muted)'}">${SETTINGS.autoSave?'Attivo':'Non attivo'}</span>
-        </div>
+        <div class="settings-section-title">💾 Percorso di salvataggio Dati</div>
+        <div id="save-path-section"></div>
       </div>
 
       <!-- INFO APP -->
@@ -2118,7 +2540,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 10:33</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 13:08</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -2778,9 +3200,22 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260222-103320';
+const APP_VERSION = '20260222-130851';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
+renderSavePathSection();
+
+// Banner avviso percorso salvataggio non configurato
+(function checkSaveMethod() {
+  if (SETTINGS.saveMethod) return; // già configurato
+  setTimeout(() => {
+    const el = document.createElement('div');
+    el.id = 'banner-no-save';
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:linear-gradient(90deg,#1a0a00,#2a1500);border-bottom:2px solid #ff4757;padding:10px 16px;display:flex;align-items:center;gap:10px;font-family:"DM Sans",sans-serif';
+    el.innerHTML = '<span style="font-size:18px">⚠️</span><span style="flex:1;font-size:13px;color:#fff;font-weight:600">Percorso di salvataggio non configurato — i dati potrebbero andare persi</span><button onclick="document.getElementById(\'banner-no-save\').remove();showTab(\'settings\')" style="padding:7px 14px;border-radius:10px;background:#ff4757;border:none;color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:sans-serif">Configura ora</button><button onclick="document.getElementById(\'banner-no-save\').remove()" style="padding:7px 14px;border-radius:10px;background:rgba(255,255,255,0.1);border:none;color:rgba(255,255,255,0.5);font-size:12px;cursor:pointer;font-family:sans-serif">✕</button>';
+    document.body.prepend(el);
+  }, 1200);
+})();
 
 // Popola badge versione nell'header
 (function() {
