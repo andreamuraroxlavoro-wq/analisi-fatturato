@@ -793,7 +793,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.85);color:rgba(255,255,255,0.85)">Andrea Muraro</strong></div>
-          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 21:50</div>
+          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 22:08</div>
         </div>
       </div>
       <div class="header-actions">
@@ -2738,6 +2738,49 @@ function _renderClientiList() {
   if (!el) return;
   el.innerHTML = _buildClientiList();
   _updateClientiCommButtons();
+  _updateClientiCounter();
+}
+
+function _updateClientiCounter() {
+  const counter = document.getElementById('clienti-counter');
+  if (!counter) return;
+
+  const rows      = allRows();
+  const totAll    = new Set(rows.map(r => r.cliente)).size;
+  const dfC       = _clientComm || [];
+  const q         = (_clientSearch || '').trim().toLowerCase();
+
+  if (!dfC.length && !q) {
+    // Nessun filtro attivo — mostra solo totale
+    counter.style.color = 'var(--text-muted)';
+    counter.style.background = 'var(--surface2)';
+    counter.style.border = 'none';
+    counter.textContent = totAll + ' totali';
+    return;
+  }
+
+  // Calcola clienti visibili con i filtri attivi
+  const byClient = {};
+  rows.forEach(r => {
+    if (!byClient[r.cliente]) byClient[r.cliente] = { comms: new Set() };
+    if (r.commerciale) byClient[r.cliente].comms.add(r.commerciale);
+  });
+
+  let filtered = Object.keys(byClient);
+  if (dfC.length) {
+    filtered = filtered.filter(nome =>
+      [...byClient[nome].comms].some(c => dfC.includes(c))
+    );
+  }
+  if (q) {
+    filtered = filtered.filter(nome => nome.toLowerCase().includes(q));
+  }
+
+  const shown = filtered.length;
+  counter.textContent = shown + ' su ' + totAll + ' totali';
+  counter.style.color = shown < totAll ? '#e2b84a' : 'var(--text-muted)';
+  counter.style.background = shown < totAll ? 'rgba(226,184,74,0.12)' : 'var(--surface2)';
+  counter.style.border = shown < totAll ? '1px solid rgba(226,184,74,0.35)' : 'none';
 }
 
 function _updateClientiCommButtons() {
@@ -2912,7 +2955,7 @@ function renderClienti() {
       </div>
       <div style="display:flex;justify-content:space-between;padding:8px 2px 0">
         <span style="font-size:11px;color:#c9a84c;text-transform:uppercase;letter-spacing:1.3px;font-weight:800">Clienti</span>
-        <span style="font-size:11px;background:var(--surface2);padding:3px 10px;border-radius:20px;color:var(--text-muted)">${totClienti} totali</span>
+        <span id="clienti-counter" style="font-size:11px;background:var(--surface2);padding:3px 10px;border-radius:20px;color:var(--text-muted)">${totClienti} totali</span>
       </div>
     </div>
     <div id="clienti-list">${_buildClientiList()}</div>
@@ -2998,7 +3041,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 21:50</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 22:08</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -3658,7 +3701,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260222-215014';
+const APP_VERSION = '20260222-220857';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
