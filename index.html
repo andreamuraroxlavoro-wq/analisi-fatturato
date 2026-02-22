@@ -793,10 +793,14 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.85);color:rgba(255,255,255,0.85)">Andrea Muraro</strong></div>
-          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 13:08</div>
+          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 13:42</div>
         </div>
       </div>
       <div class="header-actions">
+        <button id="btn-carica-dati" onclick="onCaricaDatiClick()" title="Carica Dati salvati" style="display:inline-flex;align-items:center;gap:7px;padding:10px 18px;border-radius:14px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s;border:2px solid #74b9ff;background:rgba(116,185,255,0.12);color:#74b9ff">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 15v4a2 2 0 002 2h14a2 2 0 002-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Carica Dati
+        </button>
         <button id="btn-save-dati" onclick="onSaveDatiClick()" title="Salva Dati" style="display:inline-flex;align-items:center;gap:7px;padding:10px 18px;border-radius:14px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s;border:2px solid #4caf82;background:rgba(76,175,130,0.15);color:#4caf82;position:relative">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
           Salva Dati
@@ -1022,6 +1026,26 @@ function loadSession() {
 }
 
 // ── Salva Dati: gestisce modalità e dialogo ───────────────────────────────
+function onCaricaDatiClick() {
+  const method = SETTINGS.saveMethod;
+  if (!method) {
+    // Nessun metodo: apri selettore file generico
+    document.getElementById('session-input').click();
+    return;
+  }
+  if (method === 'local') {
+    // Locale: apri selettore file
+    document.getElementById('session-input').click();
+    return;
+  }
+  if (method === 'gdrive') {
+    loadFromGDrive();
+    return;
+  }
+  // Dropbox / OneDrive: selettore file per ora
+  document.getElementById('session-input').click();
+}
+
 function onSaveDatiClick() {
   if (!DB.datasets.length) {
     toast('Nessun dato da salvare — importa prima un file Excel', 'error');
@@ -1336,6 +1360,88 @@ function connectGDrive() {
   }, 500);
 }
 
+function loadFromGDrive() {
+  if (!_gdriveTokenValid()) {
+    _showReconnectModal('Google Drive', connectGDrive, () => {
+      setTimeout(loadFromGDrive, 2000);
+    });
+    return;
+  }
+  const token = SETTINGS.gdrive_token;
+  const pad   = n => String(n).padStart(3,'0');
+  // Cerca tutti i file DB_Analisi_Fatturato_PRO_*.json su Drive
+  fetch("https://www.googleapis.com/drive/v3/files?q=name+contains+'DB_Analisi_Fatturato_PRO'&orderBy=modifiedTime+desc&fields=files(id,name,modifiedTime)", {
+    headers: { Authorization: 'Bearer ' + token }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.files || data.files.length === 0) {
+      toast('Nessun file trovato su Google Drive', 'error');
+      return;
+    }
+    if (data.files.length === 1) {
+      // Un solo file: carica direttamente
+      _downloadGDriveFile(data.files[0].id, data.files[0].name, token);
+      return;
+    }
+    // Più file: mostra dialogo di scelta
+    _showGDrivePickModal(data.files, token);
+  })
+  .catch(e => toast('Errore ricerca Google Drive: ' + e.message, 'error'));
+}
+
+window._pickGDrive = function(btn) {
+  var overlay = document.getElementById('gdrive-pick-overlay');
+  if (overlay) overlay.remove();
+  var fileId = btn.getAttribute('data-id');
+  var fname  = btn.getAttribute('data-name');
+  _downloadGDriveFile(fileId, fname, SETTINGS.gdrive_token);
+};
+
+function _showGDrivePickModal(files, token) {
+  const el = document.createElement('div');
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:99999;display:flex;align-items:flex-end;justify-content:center';
+  const fileRows = files.map(f => {
+    const date = new Date(f.modifiedTime).toLocaleDateString('it-IT', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    return '<button onclick="window._pickGDrive(this)" data-id="' + f.id + '" data-name="' + f.name + '" style="width:100%;padding:14px 16px;border-radius:12px;background:rgba(255,255,255,0.05);border:1.5px solid rgba(255,255,255,0.1);color:#fff;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center">' +
+      '<div style="font-size:13px;font-weight:700">' + f.name + '</div>' +
+      '<div style="font-size:11px;color:rgba(255,255,255,0.4)">' + date + '</div>' +
+      '</button>';
+  }).join('');
+  el.id = 'gdrive-pick-overlay';
+  el.innerHTML = '<div style="background:#1a1f2a;border:2px solid rgba(226,184,74,0.4);border-radius:20px 20px 0 0;padding:28px 24px 44px;width:100%;max-width:480px;max-height:80vh;overflow-y:auto">' +
+    '<div style="font-size:17px;font-weight:800;color:#fff;margin-bottom:6px">📂 Scegli file da caricare</div>' +
+    '<div style="font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:18px">File trovati su Google Drive</div>' +
+    '<div style="display:flex;flex-direction:column;gap:8px">' + fileRows + '</div>' +
+    '<button onclick="var o=document.getElementById(\'gdrive-pick-overlay\');if(o)o.remove()" style="width:100%;margin-top:12px;padding:13px;border-radius:14px;background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.5);font-size:13px;font-weight:600;cursor:pointer">Annulla</button>' +
+    '</div>';
+  document.body.appendChild(el);
+  el.addEventListener('click', e => { if (e.target === el) el.remove(); });
+}
+
+function _downloadGDriveFile(fileId, fname, token) {
+  toast('⏳ Caricamento ' + fname + ' da Google Drive...');
+  fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', {
+    headers: { Authorization: 'Bearer ' + token }
+  })
+  .then(r => r.json())
+  .then(parsed => {
+    const result = _parsePayload(JSON.stringify(parsed));
+    if (!result || !result.datasets.length) {
+      toast('File non valido o vuoto', 'error');
+      return;
+    }
+    DB.datasets = result.datasets;
+    window._excludedClients = result.excl || [];
+    save();
+    render();
+    markSaved();
+    const tot = DB.datasets.reduce((s,ds) => s + ds.rows.length, 0);
+    toast('\u2713 ' + fname + ' caricato: ' + DB.datasets.length + ' dataset, ' + tot + ' righe');
+  })
+  .catch(e => toast('Errore download Google Drive: ' + e.message, 'error'));
+}
+
 function disconnectGDrive() {
   SETTINGS.gdrive_token  = '';
   SETTINGS.gdrive_expiry = 0;
@@ -1466,26 +1572,18 @@ function handleSessionFile(e) {
   const reader = new FileReader();
   reader.onload = ev => {
     try {
-      const parsed = JSON.parse(ev.target.result);
-      // Supporta sia .json che .html con dati incorporati
-      if (!parsed.datasets && parsed.__EMBEDDED_DATA__) parsed = parsed.__EMBEDDED_DATA__;
-      if (!parsed.datasets || !Array.isArray(parsed.datasets)) {
-        toast('File non valido — non è una sessione Analisi Fatturato PRO', 'error');
+      const result = _parsePayload(ev.target.result);
+      if (!result || !result.datasets.length) {
+        toast('File non valido — non \u00e8 un file Analisi Fatturato PRO', 'error');
         return;
       }
-      // Ripristina dataObj da stringa data
-      parsed.datasets.forEach(ds => ds.rows.forEach(r => {
-        r.dataObj = (r.data && r.data.trim()) ? parseDate(r.data) : null;
-      }));
-      DB = { datasets: parsed.datasets };
-      // Ripristina clienti esclusi salvati nella sessione
-      window._excludedClients = Array.isArray(parsed.excludedClients) ? parsed.excludedClients : [];
-      save(); // persisti su IndexedDB
+      DB.datasets = result.datasets;
+      window._excludedClients = result.excl || [];
+      save();
       render();
-      const tot = parsed.datasets.reduce((s,ds) => s + ds.rows.length, 0);
-      const exclCount = window._excludedClients.length;
-      toast('✓ Sessione caricata: ' + parsed.datasets.length + ' dataset, ' + tot + ' righe' + (exclCount ? ' · ' + exclCount + ' clienti esclusi ripristinati' : ''));
       markSaved();
+      const tot = DB.datasets.reduce((s,ds) => s + ds.rows.length, 0);
+      toast('\u2713 Dati caricati: ' + DB.datasets.length + ' dataset, ' + tot + ' righe');
     } catch(err) {
       toast('Errore nel leggere il file: ' + err.message, 'error');
     }
@@ -2540,7 +2638,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 13:08</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 13:42</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -3200,7 +3298,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260222-130851';
+const APP_VERSION = '20260222-134238';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
