@@ -782,7 +782,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.85);color:rgba(255,255,255,0.85)">Andrea Muraro</strong></div>
-          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 10:21</div>
+          <div id="header-version" style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;background:rgba(226,184,74,0.12);border:1px solid rgba(226,184,74,0.3);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#c9a84c;letter-spacing:0.8px">v 2026.02.22 - 10:33</div>
         </div>
       </div>
       <div class="header-actions">
@@ -1071,15 +1071,19 @@ function updateSaveBtn() {
 // ============================================================
 // PERSISTENZA — localStorage semplice e affidabile su iOS PWA
 // ============================================================
-const LS_KEY = 'analisi_fatturato_pro_v1';
+// ============================================================
+// CHIAVI localStorage — tutte le chiavi usate storicamente
+// ============================================================
+const LS_KEY      = 'afp_data_v4';   // chiave attuale
+const LS_KEYS_OLD = ['analisi_fatturato_pro_v1', 'vendite_pro_v2', 'vendite_pro_v1']; // chiavi vecchie
 
 function buildPayload() {
   return {
-    _v: 3,
+    _v: 4,
     _ts: Date.now(),
     excl: window._excludedClients || [],
     ds: DB.datasets.map(ds => ({
-      id: ds.id,
+      id:   ds.id,
       name: ds.name,
       date: ds.date,
       comm: ds.commerciale,
@@ -1099,45 +1103,100 @@ function save() {
   try {
     const json = JSON.stringify(buildPayload());
     localStorage.setItem(LS_KEY, json);
-    console.log('[AFP] Salvato ' + DB.datasets.length + ' dataset (' + (json.length/1024).toFixed(0) + ' KB)');
+    // Scrivi anche su tutte le chiavi vecchie per massima compatibilità
+    LS_KEYS_OLD.forEach(k => { try { localStorage.setItem(k, json); } catch(_) {} });
+    console.log('[AFP] ✓ Salvati ' + DB.datasets.length + ' dataset (' + (json.length/1024).toFixed(0) + ' KB) su localStorage');
   } catch(e) {
-    console.error('[AFP] Errore salvataggio:', e);
+    console.error('[AFP] ✗ Errore salvataggio:', e);
     if (e.name === 'QuotaExceededError') {
-      toast('\u26a0\ufe0f Dati troppo grandi per il browser. Usa Esporta per fare un backup.', 'error');
+      toast('\u26a0\ufe0f Dati troppo grandi per il browser. Esporta un backup Excel.', 'error');
     }
   }
 }
 
-function load() {
+function _parsePayload(json) {
+  // Accetta sia il formato v4 (chiavi corte) sia il vecchio formato v2/v3
+  if (!json) return null;
   try {
-    const json = localStorage.getItem(LS_KEY);
-    if (!json) { console.log('[AFP] Nessun dato salvato'); return; }
     const p = JSON.parse(json);
-    if (!p || !Array.isArray(p.ds)) { console.log('[AFP] Formato non valido'); return; }
-    // Ricostruisci DB dal formato compresso
-    DB.datasets = p.ds.map(ds => ({
-      id:          ds.id,
-      name:        ds.name,
-      date:        ds.date,
-      commerciale: ds.comm,
-      rows: ds.rows.map(r => ({
-        cliente:     r.c,
-        fattura:     r.f,
-        data:        r.d,
-        importo:     r.i,
-        commerciale: r.v,
-        dataObj:     (r.d && r.d.trim()) ? parseDate(r.d) : null
-      }))
-    }));
-    window._excludedClients = Array.isArray(p.excl) ? p.excl : [];
-    console.log('[AFP] Caricati ' + DB.datasets.length + ' dataset da localStorage');
+    if (!p) return null;
+    // Formato v4: { _v:4, ds:[...] }
+    if (Array.isArray(p.ds)) {
+      return {
+        excl: Array.isArray(p.excl) ? p.excl : [],
+        datasets: p.ds.map(ds => ({
+          id:          ds.id,
+          name:        ds.name,
+          date:        ds.date,
+          commerciale: ds.comm || ds.commerciale || '',
+          rows: (ds.rows || []).map(r => ({
+            cliente:     r.c || r.cliente     || '',
+            fattura:     r.f || r.fattura     || '',
+            data:        r.d || r.data        || '',
+            importo:     r.i !== undefined ? r.i : (r.importo || 0),
+            commerciale: r.v || r.commerciale || '',
+            dataObj:     null  // ricalcolato dopo
+          }))
+        }))
+      };
+    }
+    // Formato vecchio v2: { datasets:[...] }
+    if (Array.isArray(p.datasets)) {
+      return {
+        excl: Array.isArray(p.excludedClients) ? p.excludedClients : [],
+        datasets: p.datasets
+      };
+    }
+    return null;
   } catch(e) {
-    console.error('[AFP] Errore caricamento:', e);
+    console.error('[AFP] Errore parsing:', e);
+    return null;
+  }
+}
+
+function load() {
+  // Prova tutte le chiavi, dalla più recente alla più vecchia
+  const allKeys = [LS_KEY, ...LS_KEYS_OLD];
+  let parsed = null;
+  let foundKey = null;
+
+  for (const key of allKeys) {
+    try {
+      const json = localStorage.getItem(key);
+      if (!json) continue;
+      const result = _parsePayload(json);
+      if (result && result.datasets && result.datasets.length > 0) {
+        parsed = result;
+        foundKey = key;
+        break;
+      }
+    } catch(e) { continue; }
+  }
+
+  if (!parsed) {
+    console.log('[AFP] Nessun dato trovato in localStorage');
+    return;
+  }
+
+  // Applica i dati
+  DB.datasets = parsed.datasets;
+  window._excludedClients = parsed.excl || [];
+
+  // Ricalcola dataObj
+  DB.datasets.forEach(ds => ds.rows.forEach(r => {
+    r.dataObj = (r.data && r.data.trim()) ? parseDate(r.data) : null;
+  }));
+
+  console.log('[AFP] ✓ Caricati ' + DB.datasets.length + ' dataset da localStorage (chiave: ' + foundKey + ')');
+
+  // Migra alla chiave attuale se trovata su chiave vecchia
+  if (foundKey !== LS_KEY) {
+    save();
+    console.log('[AFP] Migrati dati da ' + foundKey + ' → ' + LS_KEY);
   }
 }
 
 function loadFromIDB() {
-  // Alias per compatibilità — ora usa solo localStorage
   load();
   render();
   updateSaveBtn();
@@ -2059,7 +2118,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 10:21</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 10:33</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -2719,7 +2778,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260222-102123';
+const APP_VERSION = '20260222-103320';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 
