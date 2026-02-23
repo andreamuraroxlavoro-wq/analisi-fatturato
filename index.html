@@ -869,7 +869,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.82);color:rgba(255,255,255,0.82);font-weight:700">Andrea Muraro</strong></div>
-          <div id="header-version">v 2026.02.23 - 12:47</div>
+          <div id="header-version">v 2026.02.23 - 12:55</div>
         </div>
       </div>
       <div class="header-actions">
@@ -3079,11 +3079,74 @@ function _buildMonthlyChart(filteredRows, allRows_, filteredAll) {
   if (chartInstances['monthly']) { try { chartInstances['monthly'].destroy(); } catch(e){} delete chartInstances['monthly']; }
 
 
+  // Plugin pill per assi X e Y
+  const pillAxisPlugin = {
+    id: 'pillAxis',
+    afterDraw(chart) {
+      const ctx = chart.ctx;
+      const xAxis = chart.scales.x;
+      const yAxis = chart.scales.y;
+      const PILL_H = 18, PILL_PAD = 8, R = 9;
+      const FONT = '700 10px DM Sans,sans-serif';
+
+      // ── Asse X: pill per ogni tick visibile ──────────────────
+      ctx.save();
+      ctx.font = FONT;
+      xAxis.ticks.forEach((tick, i) => {
+        const lbl = tick.label;
+        if (!lbl) return;
+        const x = xAxis.getPixelForTick(i);
+        const y = xAxis.bottom + 6;
+        const w = ctx.measureText(lbl).width + PILL_PAD * 2;
+        // sfondo pill
+        ctx.beginPath();
+        ctx.roundRect(x - w/2, y, w, PILL_H, R);
+        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        // testo
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(lbl, x, y + PILL_H / 2);
+      });
+      ctx.restore();
+
+      // ── Asse Y: pill per ogni tick ────────────────────────────
+      ctx.save();
+      ctx.font = FONT;
+      yAxis.ticks.forEach((tick, i) => {
+        const lbl = fmtK(tick.value);
+        if (!lbl && lbl !== '0') return;
+        const x = yAxis.left - 6;
+        const y = yAxis.getPixelForTick(i);
+        const w = ctx.measureText(lbl).width + PILL_PAD * 2;
+        // sfondo pill
+        ctx.beginPath();
+        ctx.roundRect(x - w, y - PILL_H/2, w, PILL_H, R);
+        ctx.fillStyle = 'rgba(226,184,74,0.08)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(226,184,74,0.22)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        // testo
+        ctx.fillStyle = 'rgba(226,184,74,0.85)';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(lbl, x - PILL_PAD, y);
+      });
+      ctx.restore();
+    }
+  };
+
   chartInstances['monthly'] = new Chart(mcEl, {
     type: 'bar',
     data: { labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
+      layout: { padding: { left: 10, bottom: 28 } },
       plugins: {
         legend: { display: false },
         tooltip: { callbacks: { title: ctx => ctx[0].label, label: ctx => '  ' + ctx.dataset.label + ':  ' + fmtEur(ctx.raw) } }
@@ -3091,19 +3154,28 @@ function _buildMonthlyChart(filteredRows, allRows_, filteredAll) {
       scales: {
         x: {
           ticks: {
-            color: '#7a8099',
+            color: 'transparent',
             font: { size: 10 },
-            maxRotation: 45,
+            maxRotation: 0,
             minRotation: 0,
             maxTicksLimit: months.length <= 24 ? months.length
-                         : months.length <= 60  ? Math.ceil(months.length / 3)
-                         : Math.ceil(months.length / 6)
+                         : months.length <= 48  ? Math.ceil(months.length / 2)
+                         : months.length <= 72  ? Math.ceil(months.length / 3)
+                         : Math.ceil(months.length / 5)
           },
           grid: { display: false }
         },
-        y: { ticks: { color: '#7a8099', font: { size: 10 }, callback: v => fmtK(v) }, grid: { color: 'rgba(255,255,255,0.05)' } }
+        y: {
+          ticks: {
+            color: 'transparent',
+            font: { size: 10 },
+            callback: v => fmtK(v)
+          },
+          grid: { color: 'rgba(255,255,255,0.05)' }
+        }
       }
-    }
+    },
+    plugins: [pillAxisPlugin]
   });
 }
 
@@ -3448,7 +3520,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.23 - 12:47</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.23 - 12:55</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -4180,7 +4252,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260223-124733';
+const APP_VERSION = '20260223-125537';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
