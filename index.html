@@ -2645,7 +2645,7 @@ if (window._showAllClients === undefined) window._showAllClients = false;
 
     </div>
 
-    ${months.length > 1 ? `
+    ${months.length >= 1 ? `
     <div class="card">
       <div style="margin-bottom:12px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -3036,7 +3036,7 @@ function _buildMonthlyChart(filteredRows, allRows_, filteredAll) {
     }
   }
 
-  if (months.length < 2 && !compareComm && !compareAnni) return;
+  if (months.length < 1 && !compareComm && !compareAnni) return;
 
   // Distruggi il vecchio e ricrea (garantisce label + scale corretti)
   if (chartInstances['monthly']) { try { chartInstances['monthly'].destroy(); } catch(e){} delete chartInstances['monthly']; }
