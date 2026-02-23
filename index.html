@@ -806,7 +806,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.82);color:rgba(255,255,255,0.82);font-weight:700">Andrea Muraro</strong></div>
-          <div id="header-version">v 2026.02.23 - 07:35</div>
+          <div id="header-version">v 2026.02.23 - 07:44</div>
         </div>
       </div>
       <div class="header-actions">
@@ -1451,16 +1451,41 @@ function renderSavePathSection() {
       '<button onclick="saveCloudToken()" style="padding:10px 16px;border-radius:10px;background:rgba(226,184,74,0.2);border:1.5px solid rgba(226,184,74,0.5);color:#e2b84a;font-weight:700;font-size:12px;cursor:pointer">Salva</button>' +
       '</div>' +
       (isDropbox ? (
-        '<div style="margin-top:10px;padding:12px;background:rgba(0,97,255,0.07);border:1px solid rgba(0,97,255,0.25);border-radius:10px">' +
-        '<div style="font-size:10px;font-weight:800;color:#4caf82;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">🔄 Rinnovo automatico (consigliato)</div>' +
-        '<div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:8px">Inserisci App Key, App Secret e Refresh Token per rinnovare il token automaticamente senza doverlo ricopiare ogni 4 ore.</div>' +
-        '<div style="display:flex;flex-direction:column;gap:6px">' +
-        '<input id="sett-db-appkey" type="text" placeholder="App Key" value="' + (SETTINGS.dropbox_app_key || '') + '" style="padding:8px 12px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.3);color:#fff;font-size:12px;font-family:monospace">' +
-        '<input id="sett-db-appsecret" type="password" placeholder="App Secret" value="' + (SETTINGS.dropbox_app_secret || '') + '" style="padding:8px 12px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.3);color:#fff;font-size:12px;font-family:monospace">' +
-        '<input id="sett-db-refresh" type="password" placeholder="Refresh Token" value="' + (SETTINGS.dropbox_refresh || '') + '" style="padding:8px 12px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.3);color:#fff;font-size:12px;font-family:monospace">' +
-        '<button onclick="saveDropboxOAuth()" style="padding:9px;border-radius:8px;background:rgba(0,97,255,0.2);border:1.5px solid rgba(0,97,255,0.5);color:#4da8ff;font-weight:700;font-size:12px;cursor:pointer">💾 Salva credenziali OAuth</button>' +
-        (SETTINGS.dropbox_refresh ? '<div style="font-size:10px;color:#4caf82;margin-top:2px">✓ Rinnovo automatico attivo</div>' : '') +
-        '</div></div>'
+        (() => {
+          const hasAll = !!(SETTINGS.dropbox_app_key && SETTINGS.dropbox_app_secret && SETTINGS.dropbox_refresh);
+          const hasKey = !!(SETTINGS.dropbox_app_key && SETTINGS.dropbox_app_secret);
+          return '<div style="margin-top:10px;padding:14px;background:rgba(0,97,255,0.07);border:1px solid rgba(0,97,255,0.25);border-radius:12px">'
+            // Header
+            + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+              + '<div style="font-size:10px;font-weight:800;color:' + (hasAll ? '#4caf82' : '#4da8ff') + ';text-transform:uppercase;letter-spacing:1px">🔄 Rinnovo automatico</div>'
+              + (hasAll ? '<span style="font-size:10px;font-weight:700;color:#4caf82;background:rgba(76,175,130,0.12);border:1px solid rgba(76,175,130,0.3);border-radius:20px;padding:2px 8px">✓ Attivo</span>' : '<span style="font-size:10px;color:rgba(255,255,255,0.35)">Non configurato</span>')
+            + '</div>'
+            // Step 1: App Key + App Secret
+            + '<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.7);margin-bottom:5px">Passo 1 — App Key e App Secret</div>'
+            + '<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:10px">'
+              + '<input id="sett-db-appkey" type="text" placeholder="App Key (da dropbox.com/developers/apps)" value="' + (SETTINGS.dropbox_app_key || '') + '" style="padding:8px 12px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.3);color:#fff;font-size:12px;font-family:monospace">'
+              + '<input id="sett-db-appsecret" type="password" placeholder="App Secret" value="' + (SETTINGS.dropbox_app_secret || '') + '" style="padding:8px 12px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.3);color:#fff;font-size:12px;font-family:monospace">'
+            + '</div>'
+            // Step 2: Autorizzazione guidata
+            + '<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.7);margin-bottom:5px">Passo 2 — Ottieni il Refresh Token</div>'
+            + '<button onclick="window._startDropboxOAuth()" style="width:100%;padding:10px;border-radius:8px;background:linear-gradient(135deg,rgba(0,97,255,0.25),rgba(0,97,255,0.15));border:1.5px solid rgba(0,97,255,0.6);color:#4da8ff;font-weight:700;font-size:12px;cursor:pointer;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:8px">'
+              + '<svg viewBox="0 0 43.1 40.5" width="14" height="14"><path fill="#4da8ff" d="M12.8 0L0 8.2l12.8 8.2 12.8-8.2zM38.3 0L25.5 8.2l12.8 8.2 12.8-8.2zM0 24.7l12.8 8.2 12.8-8.2-12.8-8.2zM38.3 16.5l-12.8 8.2 12.8 8.2 12.8-8.2zM12.8 28.1l12.8 8.2 12.8-8.2-12.8-8.2z"/></svg>'
+              + '🔑 Avvia autorizzazione Dropbox'
+            + '</button>'
+            + '<div style="font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:8px">Dopo aver autorizzato, Dropbox ti mostra una pagina con un URL tipo <em>https://localhost?code=XXXX</em> — copia quell&#39;intero URL e incollalo qui sotto.</div>'
+            + '<div style="display:flex;gap:6px">'
+              + '<input id="sett-db-callbackurl" type="text" placeholder="Incolla l&#39;URL completo ricevuto da Dropbox..." style="flex:1;padding:8px 12px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.3);color:#fff;font-size:11px">'
+              + '<button onclick="window._extractDropboxCode()" style="padding:8px 12px;border-radius:8px;background:rgba(76,175,130,0.2);border:1.5px solid rgba(76,175,130,0.5);color:#4caf82;font-weight:700;font-size:11px;cursor:pointer;white-space:nowrap">→ Scambia</button>'
+            + '</div>'
+            // Refresh token manuale (alternativa)
+            + '<div style="margin-top:8px;border-top:1px solid rgba(255,255,255,0.07);padding-top:8px">'
+              + '<div style="font-size:10px;color:rgba(255,255,255,0.35);margin-bottom:5px">Oppure incolla direttamente il Refresh Token se lo hai già:</div>'
+              + '<input id="sett-db-refresh" type="password" placeholder="Refresh Token" value="' + (SETTINGS.dropbox_refresh || '') + '" style="width:100%;padding:8px 12px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.2);color:#fff;font-size:12px;font-family:monospace;box-sizing:border-box">'
+              + '<button onclick="saveDropboxOAuth()" style="width:100%;margin-top:6px;padding:9px;border-radius:8px;background:rgba(0,97,255,0.2);border:1.5px solid rgba(0,97,255,0.5);color:#4da8ff;font-weight:700;font-size:12px;cursor:pointer">💾 Salva credenziali OAuth</button>'
+            + '</div>'
+            + (hasAll ? '<div style="font-size:10px;color:#4caf82;margin-top:8px;text-align:center">✓ Rinnovo automatico attivo — il token si aggiorna ogni 4 ore</div>' : '')
+          + '</div>';
+        })()
       ) : '') +
       '<div style="display:flex;align-items:center;gap:6px;font-size:11px;margin-top:8px;color:' + (hasTokenSvc ? '#4caf82' : 'rgba(255,255,255,0.3)') + '">' +
       '<span style="width:6px;height:6px;border-radius:50%;background:' + (hasTokenSvc ? '#4caf82' : 'rgba(255,255,255,0.2)') + '"></span>' +
@@ -1535,6 +1560,76 @@ function saveCloudToken() {
   toast('✓ Token salvato');
   _renderSaveSettings();
 }
+
+// Apre Dropbox per autorizzare e avviare il flusso OAuth
+window._startDropboxOAuth = function() {
+  const appKey = (document.getElementById('sett-db-appkey') || {}).value || SETTINGS.dropbox_app_key || '';
+  if (!appKey.trim()) {
+    toast('Inserisci prima l&#39;App Key (Passo 1)', 'error');
+    return;
+  }
+  const authUrl = 'https://www.dropbox.com/oauth2/authorize'
+    + '?client_id=' + encodeURIComponent(appKey.trim())
+    + '&response_type=code'
+    + '&token_access_type=offline'
+    + '&redirect_uri=https://localhost';
+  window.open(authUrl, '_blank');
+  toast('Dopo aver autorizzato, copia l\'URL completo della pagina di errore e incollalo nel campo qui sotto', 'info');
+};
+
+// Estrae il code dall'URL incollato e lo scambia per access+refresh token
+window._extractDropboxCode = async function() {
+  const urlInput = (document.getElementById('sett-db-callbackurl') || {}).value || '';
+  const appKey    = (document.getElementById('sett-db-appkey')     || {}).value || SETTINGS.dropbox_app_key    || '';
+  const appSecret = (document.getElementById('sett-db-appsecret')  || {}).value || SETTINGS.dropbox_app_secret || '';
+
+  if (!urlInput.trim()) { toast('Incolla prima l&#39;URL ricevuto da Dropbox', 'error'); return; }
+  if (!appKey || !appSecret) { toast('Inserisci App Key e App Secret (Passo 1)', 'error'); return; }
+
+  // Estrai il code dall'URL
+  let code = '';
+  try {
+    const u = new URL(urlInput.trim());
+    code = u.searchParams.get('code') || '';
+  } catch(e) {
+    // Prova match diretto
+    const m = urlInput.match(/[?&]code=([^&]+)/);
+    if (m) code = m[1];
+  }
+  if (!code) { toast('Codice non trovato nell\'URL — assicurati di aver copiato l\'URL completo', 'error'); return; }
+
+  toast('⏳ Scambio codice in corso...');
+  try {
+    const resp = await fetch('https://api.dropbox.com/oauth2/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code:          code,
+        grant_type:    'authorization_code',
+        client_id:     appKey.trim(),
+        client_secret: appSecret.trim(),
+        redirect_uri:  'https://localhost'
+      })
+    });
+    const data = await resp.json();
+    if (data.refresh_token && data.access_token) {
+      SETTINGS.dropbox_app_key    = appKey.trim();
+      SETTINGS.dropbox_app_secret = appSecret.trim();
+      SETTINGS.dropbox_refresh    = data.refresh_token;
+      SETTINGS.dropbox_token      = data.access_token;
+      SETTINGS.dropbox_token_exp  = Date.now() + (data.expires_in || 14400) * 1000;
+      saveSettings();
+      toast('✅ Autorizzazione completata! Rinnovo automatico attivo.', 'ok');
+      setTimeout(() => _renderSaveSettings(), 600);
+    } else {
+      const err = data.error_description || data.error || 'Risposta inattesa';
+      toast('Errore Dropbox: ' + err, 'error');
+      console.error('[AFP] OAuth error:', data);
+    }
+  } catch(e) {
+    toast('Errore di rete: ' + e.message, 'error');
+  }
+};
 
 function saveDropboxOAuth() {
   const appKey    = (document.getElementById('sett-db-appkey')    || {}).value || '';
@@ -3296,7 +3391,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.23 - 07:35</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.23 - 07:44</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -3956,7 +4051,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260223-073527';
+const APP_VERSION = '20260223-074455';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
