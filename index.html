@@ -806,7 +806,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.82);color:rgba(255,255,255,0.82);font-weight:700">Andrea Muraro</strong></div>
-          <div id="header-version">v 2026.02.23 - 08:38</div>
+          <div id="header-version">v 2026.02.23 - 08:50</div>
         </div>
       </div>
       <div class="header-actions">
@@ -3394,7 +3394,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.23 - 08:38</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.23 - 08:50</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -3769,13 +3769,61 @@ function showCommercialeModal(filename, validCount) {
           </span>
         </div>
 
-        <!-- Struttura rilevata -->
-        <div style="background:rgba(226,184,74,0.07);border:1px solid rgba(226,184,74,0.2);border-radius:10px;padding:12px 14px;margin-bottom:14px">
-          <div style="font-size:10px;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">📋 Struttura rilevata</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px">
-            ${[['A','👤 Nome Cliente'],['B','🧾 N° Fattura/Ordine'],['C','📅 Data'],['F','💶 Importo']].map(([col,label]) =>
-              `<div style="font-size:11px;color:rgba(255,255,255,0.6)"><span style="font-family:monospace;font-weight:700;color:var(--gold);margin-right:5px">Col ${col}</span>${label}</div>`
+        <!-- Struttura richiesta per l'importazione -->
+        <div style="border:1.5px solid rgba(226,184,74,0.35);border-radius:12px;overflow:hidden;margin-bottom:16px">
+
+          <div style="background:linear-gradient(135deg,rgba(226,184,74,0.22),rgba(226,184,74,0.10));padding:10px 14px;border-bottom:1px solid rgba(226,184,74,0.25);display:flex;align-items:center;gap:8px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e2b84a" stroke-width="2.5" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
+            <span style="font-size:10px;font-weight:900;color:#e2b84a;text-transform:uppercase;letter-spacing:1.2px">Struttura richiesta per l'importazione del file</span>
+          </div>
+
+          <div style="background:#1a1e2a;overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-family:monospace;font-size:11px;min-width:340px">
+              <thead>
+                <tr style="background:rgba(255,255,255,0.05)">
+                  <th style="width:26px;padding:5px 0;text-align:center;color:rgba(255,255,255,0.2);font-weight:500;border-right:1px solid rgba(255,255,255,0.07);font-size:9px"> </th>
+                  ${['A','B','C','D','E','F'].map(c => {
+                    const active = ['A','B','C','F'].includes(c);
+                    return '<th style="padding:5px 4px;text-align:center;color:' + (active?'#e2b84a':'rgba(255,255,255,0.2)') + ';font-weight:' + (active?'900':'400') + ';border-right:1px solid rgba(255,255,255,0.07);background:' + (active?'rgba(226,184,74,0.1)':'') + ';font-size:11px">' + c + '</th>';
+                  }).join('')}
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-bottom:2px solid rgba(226,184,74,0.25)">
+                  <td style="padding:6px 0;text-align:center;color:rgba(255,255,255,0.18);font-size:9px;border-right:1px solid rgba(255,255,255,0.07)">1</td>
+                  <td style="padding:6px 7px;font-weight:800;color:#e2b84a;border-right:1px solid rgba(255,255,255,0.07);background:rgba(226,184,74,0.08);font-size:10px;white-space:nowrap">Nome Cliente</td>
+                  <td style="padding:6px 7px;font-weight:800;color:#e2b84a;border-right:1px solid rgba(255,255,255,0.07);background:rgba(226,184,74,0.08);font-size:10px;white-space:nowrap">N° Fattura</td>
+                  <td style="padding:6px 7px;font-weight:800;color:#e2b84a;border-right:1px solid rgba(255,255,255,0.07);background:rgba(226,184,74,0.08);font-size:10px;white-space:nowrap">Data</td>
+                  <td style="padding:6px 7px;color:rgba(255,255,255,0.15);border-right:1px solid rgba(255,255,255,0.07);font-size:10px;font-style:italic;text-align:center">—</td>
+                  <td style="padding:6px 7px;color:rgba(255,255,255,0.15);border-right:1px solid rgba(255,255,255,0.07);font-size:10px;font-style:italic;text-align:center">—</td>
+                  <td style="padding:6px 7px;font-weight:800;color:#e2b84a;border-right:1px solid rgba(255,255,255,0.07);background:rgba(226,184,74,0.08);font-size:10px;white-space:nowrap">Importo €</td>
+                </tr>
+                ${[
+                  ['ROSSI SRL','FT-001','15/01/2025','','','1.250,00'],
+                  ['BIANCHI SPA','FT-002','22/01/2025','','','890,50'],
+                  ['VERDE & CO.','FT-003','30/01/2025','','','3.400,00'],
+                ].map((row, ri) =>
+                  '<tr style="border-bottom:1px solid rgba(255,255,255,0.05)">'
+                  + '<td style="padding:5px 0;text-align:center;color:rgba(255,255,255,0.18);font-size:9px;border-right:1px solid rgba(255,255,255,0.07)">' + (ri+2) + '</td>'
+                  + '<td style="padding:5px 7px;color:rgba(255,255,255,0.72);border-right:1px solid rgba(255,255,255,0.07);background:rgba(226,184,74,0.03);font-size:10px">' + row[0] + '</td>'
+                  + '<td style="padding:5px 7px;color:rgba(255,255,255,0.55);border-right:1px solid rgba(255,255,255,0.07);background:rgba(226,184,74,0.03);font-size:10px">' + row[1] + '</td>'
+                  + '<td style="padding:5px 7px;color:rgba(255,255,255,0.55);border-right:1px solid rgba(255,255,255,0.07);background:rgba(226,184,74,0.03);font-size:10px">' + row[2] + '</td>'
+                  + '<td style="padding:5px 7px;color:rgba(255,255,255,0.12);border-right:1px solid rgba(255,255,255,0.07);font-size:10px;text-align:center">·</td>'
+                  + '<td style="padding:5px 7px;color:rgba(255,255,255,0.12);border-right:1px solid rgba(255,255,255,0.07);font-size:10px;text-align:center">·</td>'
+                  + '<td style="padding:5px 7px;color:#4cdf8a;border-right:1px solid rgba(255,255,255,0.07);background:rgba(226,184,74,0.03);font-size:10px;font-weight:700">' + row[5] + '</td>'
+                  + '</tr>'
+                ).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <div style="padding:9px 14px;background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.06);display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center">
+            ${[['A','Nome Cliente'],['B','N° Fattura/Ordine'],['C','Data'],['F','Importo €']].map(([col,desc]) =>
+              '<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:rgba(255,255,255,0.5)">'
+              + '<span style="font-family:monospace;font-weight:900;font-size:10px;color:#e2b84a;background:rgba(226,184,74,0.15);border:1px solid rgba(226,184,74,0.4);border-radius:3px;padding:0 5px;line-height:16px">' + col + '</span>'
+              + desc + '</span>'
             ).join('')}
+            <span style="font-size:10px;color:rgba(255,255,255,0.25);border-left:1px solid rgba(255,255,255,0.1);padding-left:10px">D · E ignorati</span>
           </div>
         </div>
 
@@ -4070,7 +4118,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260223-083829';
+const APP_VERSION = '20260223-085049';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
