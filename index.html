@@ -576,8 +576,71 @@
     white-space: nowrap;
   }
   .toast.error { background: var(--red); }
+  .toast.ok {
+    background: linear-gradient(135deg,#0d4f2b,#1a6e3c);
+    border: 2px solid #4cdf8a;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 16px 26px;
+    max-width: 460px;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.5;
+    box-shadow: 0 0 30px rgba(76,223,138,0.35);
+  }
   @keyframes toastIn { from { opacity:0; top:40px } to { opacity:1; top:60px } }
   @keyframes toastOut { to { opacity:0; top:40px } }
+
+  /* ── Storage status bar ─────────────────────────────────── */
+  #storage-status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 5px 16px;
+    background: rgba(0,0,0,0.3);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    min-height: 32px;
+  }
+  #storage-status-bar .ssb-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.25);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-right: 4px;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .ssb-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 11px 3px 7px;
+    border-radius: 20px;
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.4s;
+  }
+  .ssb-item.active {
+    color: #4cdf8a;
+    background: rgba(76,223,138,0.10);
+    border: 1.5px solid rgba(76,223,138,0.4);
+  }
+  .ssb-item.inactive {
+    color: rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.03);
+    border: 1.5px solid rgba(255,255,255,0.08);
+  }
+  .ssb-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .ssb-item.active  .ssb-dot { background:#4cdf8a; box-shadow:0 0 5px #4cdf8a; animation: pulse-dot 2s ease-in-out infinite; }
+  .ssb-item.inactive .ssb-dot { background:#e05c5c; }
+  .ssb-sep { color:rgba(255,255,255,0.1); font-size:10px; }
 
   /* DATASETS LIST */
   .dataset-item {
@@ -806,7 +869,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.82);color:rgba(255,255,255,0.82);font-weight:700">Andrea Muraro</strong></div>
-          <div id="header-version">v 2026.02.23 - 09:06</div>
+          <div id="header-version">v 2026.02.23 - 10:18</div>
         </div>
       </div>
       <div class="header-actions">
@@ -828,6 +891,9 @@
       <input type="file" id="session-input" accept=".json,.html" onchange="handleSessionFile(event)">
     </div>
   </header>
+
+  <!-- Status bar metodo salvataggio -->
+  <div id="storage-status-bar"></div>
 
   <div class="tabs">
     <div class="tab active" onclick="showTab('dashboard')">
@@ -907,9 +973,11 @@ let _dirHandle = null;
     const s = localStorage.getItem('vendite_pro_settings');
     if (s) SETTINGS = Object.assign(SETTINGS, JSON.parse(s));
   } catch(e) {}
+  setTimeout(() => _renderStorageStatusBar(), 0);
 })();
 function saveSettings() {
   try { localStorage.setItem('vendite_pro_settings', JSON.stringify(SETTINGS)); } catch(e) {}
+  _renderStorageStatusBar();
 }
 
 // ── Dropbox OAuth: restituisce sempre un access token valido ──────────────
@@ -1304,6 +1372,44 @@ function methodLabel(m) {
   return { dropbox:'Dropbox', onedrive:'OneDrive', local:'Download locale' }[m] || m;
 }
 
+function _renderStorageStatusBar() {
+  const bar = document.getElementById('storage-status-bar');
+  if (!bar) return;
+  const active = SETTINGS.saveMethod || '';
+
+  const methods = [
+    {
+      id: 'dropbox',
+      label: 'Dropbox',
+      icon: '<svg viewBox="0 0 43.1 40.5" width="12" height="12"><path fill="currentColor" d="M12.8 0L0 8.2l12.8 8.2 12.8-8.2zM38.3 0L25.5 8.2l12.8 8.2 12.8-8.2zM0 24.7l12.8 8.2 12.8-8.2-12.8-8.2zM38.3 16.5l-12.8 8.2 12.8 8.2 12.8-8.2zM12.8 28.1l12.8 8.2 12.8-8.2-12.8-8.2z"/></svg>',
+      extra: active==='dropbox' && SETTINGS.dropbox_refresh ? ' · OAuth' : ''
+    },
+    {
+      id: 'onedrive',
+      label: 'OneDrive',
+      icon: '<svg viewBox="0 0 32 32" width="12" height="12"><path d="M19.2 12.8A7.2 7.2 0 006.4 16H6a6 6 0 000 12h20a5 5 0 000-10 4.98 4.98 0 00-1.1.12A7.2 7.2 0 0019.2 12.8z" fill="currentColor"/></svg>',
+      extra: ''
+    },
+    {
+      id: 'local',
+      label: 'Locale',
+      icon: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>',
+      extra: ''
+    }
+  ];
+
+  bar.innerHTML =
+    '<span class="ssb-label">Archiviazione:</span>'
+    + methods.map(m => {
+        const isActive = active === m.id;
+        return '<div class="ssb-item ' + (isActive ? 'active' : 'inactive') + '" title="' + (isActive ? '✓ Metodo attivo — salvataggio e caricamento abilitati' : 'Non attivo — configura in Impostazioni') + '">'
+          + '<span class="ssb-dot"></span>'
+          + m.icon
+          + '<span>' + m.label + (isActive && m.extra ? m.extra : '') + '</span>'
+        + '</div>';
+      }).join('<span class="ssb-sep">·</span>');
+}
+
 window._doSaveOverwrite = function() {
   var o = document.getElementById('save-opts-overlay');
   if (o) o.remove();
@@ -1622,7 +1728,7 @@ window._extractDropboxCode = async function() {
       SETTINGS.dropbox_token      = data.access_token;
       SETTINGS.dropbox_token_exp  = Date.now() + (data.expires_in || 14400) * 1000;
       saveSettings();
-      toast('✅ Autorizzazione completata! Rinnovo automatico attivo.', 'ok');
+      toast('✅ Dropbox collegato! Il tuo account Dropbox è ora attivo — salvataggio e caricamento automatici abilitati.', 'ok', 10000);
       setTimeout(() => _renderSaveSettings(), 600);
     } else {
       const err = data.error_description || data.error || 'Risposta inattesa';
@@ -3394,7 +3500,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.23 - 09:06</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.23 - 10:18</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -4099,12 +4205,20 @@ function parseDate(s) {
 function emptyState(icon, title, text) {
   return `<div class="empty"><div class="empty-icon">${icon}</div><h3>${title}</h3><p>${text}</p><button class="confirm-btn" style="margin-top:24px;max-width:280px" onclick="openImportFlow()">Importa file Excel</button></div>`;
 }
-function toast(msg, type='success') {
+function toast(msg, type='success', duration=3100) {
   const t = document.createElement('div');
-  t.className = 'toast' + (type==='error'?' error':'');
+  t.className = 'toast' + (type==='error'?' error':type==='ok'?' ok':'');
   t.textContent = msg;
+  // Per durate lunghe: disabilita l'animazione di uscita a 2.7s
+  if (duration > 3500) {
+    t.style.animation = 'toastIn 0.3s forwards';
+    setTimeout(() => {
+      t.style.animation = 'toastOut 0.5s forwards';
+      setTimeout(() => t.remove(), 500);
+    }, duration - 500);
+  }
   document.body.appendChild(t);
-  setTimeout(() => t.remove(), 3100);
+  if (duration <= 3500) setTimeout(() => t.remove(), duration);
 }
 
 // ============================================================
@@ -4118,10 +4232,11 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260223-090644';
+const APP_VERSION = '20260223-101857';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
+_renderStorageStatusBar();
 
 // ── Auto-load unificato all'avvio ────────────────────────────────────────
 // localStorage: già caricato da loadFromIDB() — il toast è gestito lì.
