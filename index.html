@@ -869,7 +869,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.82);color:rgba(255,255,255,0.82);font-weight:700">Andrea Muraro</strong></div>
-          <div id="header-version">v 2026.02.23 - 13:18</div>
+          <div id="header-version">v 2026.02.23 - 13:25</div>
         </div>
       </div>
       <div class="header-actions">
@@ -2647,25 +2647,21 @@ if (window._showAllClients === undefined) window._showAllClients = false;
 
     ${months.length > 1 ? `
     <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div class="card-title" style="margin-bottom:0">Fatturato mensile</div>
+      <div style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div class="card-title" style="margin-bottom:0">Fatturato mensile</div>
+          ${(function(){
+            const dc = window._dfComm||[];
+            const cc = window._dfCompare && df.anni.length >= 2;
+            if (cc) return '<span style="font-size:10px;background:rgba(162,155,254,0.15);color:#a29bfe;border:1px solid rgba(162,155,254,0.4);padding:3px 10px;border-radius:20px;font-weight:600">⇄ Confronto per mese</span>';
+            return '';
+          })()}
+        </div>
         ${(function(){
-          const dc = window._dfComm||[];
-          const cc = window._dfCompare && df.anni.length >= 2;
-          if (dc.length >= 2) return '<span style="font-size:10px;background:rgba(255,107,107,0.15);color:#ff6b6b;border:1px solid rgba(255,107,107,0.4);padding:3px 10px;border-radius:20px;font-weight:600">⇄ Confronto commerciali</span>';
-          if (cc) return '<span style="font-size:10px;background:rgba(162,155,254,0.15);color:#a29bfe;border:1px solid rgba(162,155,254,0.4);padding:3px 10px;border-radius:20px;font-weight:600">⇄ Confronto per mese</span>';
-          return '';
-        })()}
-      </div>
-      <div id="dash-chart-wrap" class="chart-wrap" style="${compareMode && df.anni.length >= 2 ? 'height:260px' : ''}"><canvas id="chart-monthly"></canvas></div>
-      ${(function(){
-        // Legenda custom pill per TUTTI i casi: anni, commerciali, confronto
-        const dc = window._dfComm || [];
-        const cc = window._dfCompare && df.anni.length >= 2;
-
-        // Caso confronto commerciali
-        if (dc.length >= 2) {
-          return '<div id="chart-legend-pills" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;justify-content:center">'
+          // Commerciali SOPRA il grafico
+          const dc = window._dfComm || [];
+          if (!dc.length) return '';
+          return '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:10px">'
             + dc.map(comm => {
                 const c = commColor(commsDisp, comm);
                 return '<span style="display:inline-flex;align-items:center;gap:6px;padding:5px 13px;border-radius:20px;border:2px solid ' + c.border + ';background:' + c.bg + ';color:' + c.text + ';font-size:11px;font-weight:700;font-family:DM Sans,sans-serif">'
@@ -2673,55 +2669,22 @@ if (window._showAllClients === undefined) window._showAllClients = false;
                   + esc(comm) + '</span>';
               }).join('')
             + '</div>';
-        }
-
-        // Caso confronto anni
-        if (cc) {
-          return '<div id="chart-legend-pills" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;justify-content:center">'
-            + df.anni.map(a => {
-                const c = annoColor(anniDisp, a);
-                return '<span style="display:inline-flex;align-items:center;gap:6px;padding:5px 13px;border-radius:20px;border:2px solid ' + c.border + ';background:' + c.bg + ';color:' + c.text + ';font-size:11px;font-weight:700;font-family:DM Sans,sans-serif">'
-                  + '<span style="width:8px;height:8px;border-radius:50%;background:' + c.border + ';flex-shrink:0"></span>'
-                  + a + '</span>';
-              }).join('')
-            + '</div>';
-        }
-
-        // Caso multi-anno NON confronto: mostra pill anni colorati
-        if (df.anni.length >= 2 && !df.quick) {
-          return '<div id="chart-legend-pills" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;justify-content:center">'
-            + df.anni.map(a => {
-                const c = annoColor(anniDisp, a);
-                return '<span style="display:inline-flex;align-items:center;gap:6px;padding:5px 13px;border-radius:20px;border:2px solid ' + c.border + ';background:' + c.bg + ';color:' + c.text + ';font-size:11px;font-weight:700;font-family:DM Sans,sans-serif">'
-                  + '<span style="width:8px;height:8px;border-radius:50%;background:' + c.border + ';flex-shrink:0"></span>'
-                  + a + '</span>';
-              }).join('')
-            + '</div>';
-        }
-
-        // Caso singolo anno selezionato o quick filter
-        if (df.anni.length === 1) {
-          const a = df.anni[0];
-          const c = annoColor(anniDisp, a);
-          return '<div id="chart-legend-pills" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;justify-content:center">'
-            + '<span style="display:inline-flex;align-items:center;gap:6px;padding:5px 13px;border-radius:20px;border:2px solid ' + c.border + ';background:' + c.bg + ';color:' + c.text + ';font-size:11px;font-weight:700;font-family:DM Sans,sans-serif">'
-            + '<span style="width:8px;height:8px;border-radius:50%;background:' + c.border + ';flex-shrink:0"></span>'
-            + a + '</span></div>';
-        }
-
-        // Caso nessun filtro (tutti anni) → un pill per ogni anno presente
-        if (!df.quick && anniDisp.length >= 1) {
-          return '<div id="chart-legend-pills" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;justify-content:center">'
-            + anniDisp.map(a => {
-                const c = annoColor(anniDisp, a);
-                return '<span style="display:inline-flex;align-items:center;gap:6px;padding:5px 13px;border-radius:20px;border:2px solid ' + c.border + ';background:' + c.bg + ';color:' + c.text + ';font-size:11px;font-weight:700;font-family:DM Sans,sans-serif">'
-                  + '<span style="width:8px;height:8px;border-radius:50%;background:' + c.border + ';flex-shrink:0"></span>'
-                  + a + '</span>';
-              }).join('')
-            + '</div>';
-        }
-
-        return '';
+        })()}
+      </div>
+      <div id="dash-chart-wrap" class="chart-wrap" style="${compareMode && df.anni.length >= 2 ? 'height:260px' : ''}"><canvas id="chart-monthly"></canvas></div>
+      ${(function(){
+        // Anni SOTTO il grafico (sempre, se non è quick filter)
+        if (df.quick) return '';
+        const anniMostrati = df.anni.length ? df.anni : anniDisp;
+        if (!anniMostrati.length) return '';
+        return '<div id="chart-legend-pills" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;justify-content:center">'
+          + anniMostrati.map(a => {
+              const c = annoColor(anniDisp, a);
+              return '<span style="display:inline-flex;align-items:center;gap:6px;padding:5px 13px;border-radius:20px;border:2px solid ' + c.border + ';background:' + c.bg + ';color:' + c.text + ';font-size:11px;font-weight:700;font-family:DM Sans,sans-serif">'
+                + '<span style="width:8px;height:8px;border-radius:50%;background:' + c.border + ';flex-shrink:0"></span>'
+                + a + '</span>';
+            }).join('')
+          + '</div>';
       })()}
 
       <!-- Box media mensile sotto il grafico -->
@@ -3490,7 +3453,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.23 - 13:18</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.23 - 13:25</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -4222,7 +4185,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260223-131822';
+const APP_VERSION = '20260223-132528';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
