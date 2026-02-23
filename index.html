@@ -1923,6 +1923,7 @@ function _applyLoadedData(result, sourceName) {
     r.dataObj = (r.data && r.data.trim()) ? parseDate(r.data) : null;
   }));
   save(); render(); markSaved();
+  showTab('dashboard');
   const tot = DB.datasets.reduce((s, ds) => s + ds.rows.length, 0);
   toast('\u2713 ' + sourceName + ' caricato: ' + DB.datasets.length + ' dataset, ' + tot + ' righe');
   return true;
