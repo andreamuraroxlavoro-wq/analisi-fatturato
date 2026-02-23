@@ -869,7 +869,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.82);color:rgba(255,255,255,0.82);font-weight:700">Andrea Muraro</strong></div>
-          <div id="header-version">v 2026.02.23 - 10:18</div>
+          <div id="header-version">v 2026.02.23 - 12:13</div>
         </div>
       </div>
       <div class="header-actions">
@@ -957,13 +957,12 @@ let _unsavedChanges = false;
 let SETTINGS = {
   fileName:            'DB_Analisi_Fatturato_PRO',
   autoSave:            false,
-  saveMethod:          '',       // 'dropbox' | 'onedrive' | 'local' | ''
+  saveMethod:          '',       // 'dropbox' | 'local' | ''
   dropbox_token:       '',       // access token corrente (si aggiorna automaticamente)
   dropbox_refresh:     '',       // refresh token (permanente)
   dropbox_app_key:     '',       // App Key dalla console Dropbox
   dropbox_app_secret:  '',       // App Secret dalla console Dropbox
   dropbox_token_exp:   0,        // timestamp ms scadenza access token
-  onedrive_token:      '',
   fileCounter:         1         // progressivo per i nuovi file
 };
 // Handle cartella locale (Chrome File System API) — non serializzabile, tenuto in memoria
@@ -1162,7 +1161,6 @@ function onCaricaDatiClick() {
     return;
   }
   if (method === 'dropbox')  { loadFromDropbox();  return; }
-  if (method === 'onedrive') { loadFromOneDrive(); return; }
   document.getElementById('session-input').click();
 }
 
@@ -1178,7 +1176,7 @@ function onSaveDatiClick() {
     return;
   }
   // Per cloud: sincronizza il contatore con i file presenti, poi apri modal
-  if (method === 'dropbox' || method === 'onedrive') {
+  if (method === 'dropbox') {
     toast('\u23f3 Verifica file sul cloud...');
     _syncCloudCounter(method).then(() => showSaveOptionsModal(method));
   } else {
@@ -1242,23 +1240,6 @@ function _syncCloudCounter(method) {
     })();
   }
 
-  if (method === 'onedrive') {
-    const token = SETTINGS.onedrive_token;
-    if (!token) return Promise.resolve();
-    return fetch("https://graph.microsoft.com/v1.0/me/drive/special/approot/children?$select=name,lastModifiedDateTime", {
-      headers: { Authorization: 'Bearer ' + token }
-    })
-      .then(r => r.json())
-      .then(data => {
-        if (!data.value) return;
-        syncCounter(parseFiles(data.value.map(f => ({
-          name: f.name, num: extractNum(f.name),
-          modified: f.lastModifiedDateTime || null
-        }))));
-      })
-      .catch(() => {});
-  }
-
   return Promise.resolve();
 }
 
@@ -1292,10 +1273,7 @@ function _methodBigIcon(m) {
         '<path fill="#0061ff" d="M0 24.7l12.8 8.2 12.8-8.2-12.8-8.2zM38.3 16.5l-12.8 8.2 12.8 8.2 12.8-8.2z"/>' +
         '<path fill="#0061ff" d="M12.8 28.1l12.8 8.2 12.8-8.2-12.8-8.2z"/>' +
       '</svg>',
-    onedrive:
-      '<svg viewBox="0 0 32 32" width="52" height="52">' +
-        '<path d="M19.2 12.8A7.2 7.2 0 006.4 16H6a6 6 0 000 12h20a5 5 0 000-10 4.98 4.98 0 00-1.1.12A7.2 7.2 0 0019.2 12.8z" fill="#0078d4"/>' +
-      '</svg>',
+
     local:
       '<svg viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="#e2b84a" stroke-width="1.5" stroke-linecap="round">' +
         '<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>' +
@@ -1305,7 +1283,7 @@ function _methodBigIcon(m) {
 }
 
 function _methodColor(m) {
-  return { dropbox:'#0061ff', onedrive:'#0078d4', local:'#e2b84a' }[m] || '#e2b84a';
+  return { dropbox:'#0061ff', local:'#e2b84a' }[m] || '#e2b84a';
 }
 
 function showSaveOptionsModal(method) {
@@ -1369,7 +1347,7 @@ function showSaveOptionsModal(method) {
 }
 
 function methodLabel(m) {
-  return { dropbox:'Dropbox', onedrive:'OneDrive', local:'Download locale' }[m] || m;
+  return { dropbox:'Dropbox', local:'Download locale' }[m] || m;
 }
 
 function _renderStorageStatusBar() {
@@ -1384,12 +1362,7 @@ function _renderStorageStatusBar() {
       icon: '<svg viewBox="0 0 43.1 40.5" width="12" height="12"><path fill="currentColor" d="M12.8 0L0 8.2l12.8 8.2 12.8-8.2zM38.3 0L25.5 8.2l12.8 8.2 12.8-8.2zM0 24.7l12.8 8.2 12.8-8.2-12.8-8.2zM38.3 16.5l-12.8 8.2 12.8 8.2 12.8-8.2zM12.8 28.1l12.8 8.2 12.8-8.2-12.8-8.2z"/></svg>',
       extra: active==='dropbox' && SETTINGS.dropbox_refresh ? ' · OAuth' : ''
     },
-    {
-      id: 'onedrive',
-      label: 'OneDrive',
-      icon: '<svg viewBox="0 0 32 32" width="12" height="12"><path d="M19.2 12.8A7.2 7.2 0 006.4 16H6a6 6 0 000 12h20a5 5 0 000-10 4.98 4.98 0 00-1.1.12A7.2 7.2 0 0019.2 12.8z" fill="currentColor"/></svg>',
-      extra: ''
-    },
+
     {
       id: 'local',
       label: 'Locale',
@@ -1441,7 +1414,6 @@ function doSaveDati(mode) {
     return;
   }
   if (method === 'dropbox')  { saveToDropbox(blob, fname);  return; }
-  if (method === 'onedrive') { saveToOneDrive(blob, fname); return; }
 }
 
 // ── Salvataggio locale: Chrome (File System API) o Safari (Download) ─────
@@ -1520,8 +1492,6 @@ function renderSavePathSection() {
   const methods = [
     { id:'dropbox',  label:'Dropbox',      color:'#0061ff',
       icon:'<svg viewBox="0 0 43.1 40.5" width="22" height="22"><path fill="#0061ff" d="M12.8 0L0 8.2l12.8 8.2 12.8-8.2zM38.3 0L25.5 8.2l12.8 8.2 12.8-8.2zM0 24.7l12.8 8.2 12.8-8.2-12.8-8.2zM38.3 16.5l-12.8 8.2 12.8 8.2 12.8-8.2zM12.8 28.1l12.8 8.2 12.8-8.2-12.8-8.2z"/></svg>' },
-    { id:'onedrive', label:'OneDrive',     color:'#0078d4',
-      icon:'<svg viewBox="0 0 32 32" width="22" height="22"><path d="M19.2 12.8A7.2 7.2 0 006.4 16H6a6 6 0 000 12h20a5 5 0 000-10 4.98 4.98 0 00-1.1.12A7.2 7.2 0 0019.2 12.8z" fill="#0078d4"/></svg>' },
     { id:'local',    label:'Download',     color:'#e2b84a',
       icon:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#e2b84a" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>' }
   ];
@@ -1542,10 +1512,10 @@ function renderSavePathSection() {
     const isDropbox   = m === 'dropbox';
     const svcColor    = isDropbox ? '#0061ff' : '#0078d4';
     const hasTokenSvc = !!(SETTINGS[m + '_token']);
-    const guideBtn    = isDropbox ? 'window._showDropboxGuide()' : 'window._showOneDriveGuide()';
+    const guideBtn    = 'window._showDropboxGuide()';
     const svcIcon     = isDropbox
       ? '<svg viewBox="0 0 43.1 40.5" width="13" height="13"><path fill="#0061ff" d="M12.8 0L0 8.2l12.8 8.2 12.8-8.2zM38.3 0L25.5 8.2l12.8 8.2 12.8-8.2zM0 24.7l12.8 8.2 12.8-8.2-12.8-8.2zM38.3 16.5l-12.8 8.2 12.8 8.2 12.8-8.2zM12.8 28.1l12.8 8.2 12.8-8.2-12.8-8.2z"/></svg>'
-      : '<svg viewBox="0 0 32 32" width="13" height="13"><path d="M19.2 12.8A7.2 7.2 0 006.4 16H6a6 6 0 000 12h20a5 5 0 000-10 4.98 4.98 0 00-1.1.12A7.2 7.2 0 0019.2 12.8z" fill="#0078d4"/></svg>';
+      : '';
     return '<div style="margin-top:4px;background:rgba(255,255,255,0.04);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,0.08)">' +
       '<button onclick="' + guideBtn + '" style="display:flex;align-items:center;gap:10px;width:100%;padding:13px 16px;border-radius:12px;background:linear-gradient(135deg,' + svcColor + '22,' + svcColor + '11);border:2px solid ' + svcColor + '77;color:#fff;cursor:pointer;margin-bottom:14px;text-align:left">' +
       '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="' + svcColor + '" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>' +
@@ -1647,7 +1617,7 @@ function renderSavePathSection() {
   el.innerHTML =
     '<div style="padding:0 18px 18px;display:flex;flex-direction:column;gap:12px">' +
     '<div style="font-size:12px;color:rgba(255,255,255,0.45);padding-top:16px;padding-bottom:4px">Scegli dove salvare il file <strong style="color:var(--gold)">DB_Analisi_Fatturato_PRO</strong></div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">' + tilesHTML + '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' + tilesHTML + '</div>' +
     tokenHTML +
     pathBox +
     '<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(255,255,255,0.4)">' +
@@ -1790,43 +1760,6 @@ window._showDropboxGuide = function() {
         action:'', note:'✅ Da ora il token si rinnova automaticamente ogni 4 ore. Non dovrai più fare nulla.' }
     ],
     footer: { icon:'🔄', text:'<strong style="color:#0061ff">Rinnovo automatico:</strong> con App Key + App Secret + Refresh Token il token si rinnova da solo ogni 4 ore — nessuna azione richiesta da te.' }
-  });
-};
-
-// ── Guida OneDrive ───────────────────────────────────────────────────────
-window._showOneDriveGuide = function() {
-  if (document.getElementById('onedrive-guide-overlay')) return;
-  _showTokenGuide({
-    id: 'onedrive-guide-overlay',
-    title: 'Come ottenere il Token OneDrive',
-    subtitle: 'Microsoft OneDrive · 6 passi · circa 10 minuti',
-    color: '#0078d4',
-    icon: '<svg viewBox="0 0 32 32" width="28" height="28"><path d="M19.2 12.8A7.2 7.2 0 006.4 16H6a6 6 0 000 12h20a5 5 0 000-10 4.98 4.98 0 00-1.1.12A7.2 7.2 0 0019.2 12.8z" fill="#0078d4"/></svg>',
-    iconBg: 'rgba(0,120,212,0.15)',
-    iconBorder: 'rgba(0,120,212,0.4)',
-    steps: [
-      { n:'1', title:'Vai al portale Azure',
-        desc:'Clicca qui sotto per aprire il portale Azure di Microsoft. Accedi con il tuo account Microsoft (lo stesso di OneDrive).',
-        action:'<a href="https://portal.azure.com" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:12px;background:rgba(0,120,212,0.2);border:2px solid rgba(0,120,212,0.5);color:#0078d4;font-weight:700;font-size:13px;text-decoration:none">🔗 Apri Azure Portal</a>',
-        note:'' },
-      { n:'2', title:'Registra una nuova app',
-        desc:'Cerca <strong style="color:#fff">App registrations</strong> nella barra di ricerca. Clicca <strong style="color:#fff">+ New registration</strong>. Come nome inserisci <strong style="color:#e2b84a">AnalisiFatturatoPRO</strong>. Lascia tutto il resto invariato e clicca <strong style="color:#fff">Register</strong>.',
-        action:'', note:'' },
-      { n:'3', title:'Aggiungi i permessi OneDrive',
-        desc:'Nel menu a sinistra clicca <strong style="color:#fff">API permissions → + Add a permission → Microsoft Graph → Delegated permissions</strong>. Cerca e seleziona <strong style="color:#e2b84a">Files.ReadWrite</strong>. Clicca <strong style="color:#fff">Add permissions</strong>.',
-        action:'', note:'' },
-      { n:'4', title:'Crea un Client Secret',
-        desc:'Nel menu clicca <strong style="color:#fff">Certificates & secrets → + New client secret</strong>. Scegli una scadenza (es. 24 mesi) e clicca <strong style="color:#fff">Add</strong>. <strong style="color:#ff4757">Copia subito il valore</strong> — non sarà più visibile dopo.',
-        action:'', note:'⚠️ Copia il campo <strong style="color:#fff">Value</strong>, non l&#39;ID.' },
-      { n:'5', title:'Ottieni il token con Graph Explorer',
-        desc:'Vai su <a href="https://developer.microsoft.com/en-us/graph/graph-explorer" target="_blank" style="color:#0078d4">Graph Explorer</a>, accedi con il tuo account Microsoft e copia il token dalla sezione <strong style="color:#fff">Access token</strong> in alto a destra.',
-        action:'<a href="https://developer.microsoft.com/en-us/graph/graph-explorer" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:12px;background:rgba(0,120,212,0.2);border:2px solid rgba(0,120,212,0.5);color:#0078d4;font-weight:700;font-size:13px;text-decoration:none">🔗 Apri Graph Explorer</a>',
-        note:'' },
-      { n:'6', title:'Incolla il token nell&#39;app',
-        desc:'Copia il token da Graph Explorer e incollalo nel campo <strong style="color:#e2b84a">Token di accesso OneDrive</strong>, poi clicca <strong style="color:#fff">Salva</strong>.',
-        action:'', note:'✅ I file verranno salvati in <strong style="color:#fff">OneDrive/Apps/AnalisiFatturatoPRO/</strong>' }
-    ],
-    footer: { icon:'⏱️', text:'<strong style="color:#0078d4">Token in scadenza:</strong> il token Microsoft dura circa 1 ora. Per uso continuativo valuta di impostare un refresh token — contatta il supporto se necessario.' }
   });
 };
 
@@ -2019,49 +1952,6 @@ async function _downloadDropboxFile(path, fname, tokenArg) {
   .catch(e => toast('Errore download Dropbox: ' + (e.message || 'file non leggibile'), 'error'));
 }
 
-function loadFromOneDrive() {
-  const token = SETTINGS.onedrive_token;
-  if (!token) { toast('Token OneDrive non configurato — vai in Impostazioni', 'error'); return; }
-  toast('\u23f3 Ricerca file su OneDrive...');
-  fetch("https://graph.microsoft.com/v1.0/me/drive/special/approot/children?$select=name,lastModifiedDateTime,id", {
-    headers: { Authorization: 'Bearer ' + token }
-  })
-  .then(r => r.json())
-  .then(data => {
-    if (data.error) { toast('Errore OneDrive: ' + data.error.message, 'error'); return; }
-    const base = 'DB_Analisi_Fatturato_PRO';
-    const extractNum = name => { const m = name.match(/DB_Analisi_Fatturato_PRO_(\d+)\.json$/i); return m ? parseInt(m[1],10) : 0; };
-    const files = (data.value || [])
-      .filter(f => f.name && f.name.startsWith(base))
-      .map(f => ({ name: f.name, num: extractNum(f.name), id: f.id, modified: f.lastModifiedDateTime || null }))
-      .filter(f => f.num > 0)
-      .sort((a, b) => a.modified && b.modified ? new Date(b.modified) - new Date(a.modified) : b.num - a.num);
-
-    if (!files.length) { toast('Nessun file trovato su OneDrive', 'error'); return; }
-
-    // Sincronizza fileCounter
-    const cloudMax = Math.max(...files.map(f => f.num));
-    if (cloudMax > (SETTINGS.fileCounter || 1)) { SETTINGS.fileCounter = cloudMax; saveSettings(); }
-    window._cloudFiles = files;
-
-    if (files.length === 1) {
-      _downloadOneDriveFile(files[0].id, files[0].name, token);
-    } else {
-      _showCloudPickModal(files, 'onedrive', token);
-    }
-  })
-  .catch(e => toast('Errore rete OneDrive: ' + e.message, 'error'));
-}
-
-function _downloadOneDriveFile(id, fname, token) {
-  toast('\u23f3 Caricamento ' + fname + '...');
-  fetch('https://graph.microsoft.com/v1.0/me/drive/items/' + id + '/content', {
-    headers: { Authorization: 'Bearer ' + token }
-  })
-  .then(r => r.text())
-  .then(txt => { _applyLoadedData(_parsePayload(txt), fname); })
-  .catch(e => toast('Errore download OneDrive: ' + e.message, 'error'));
-}
 
 // Modal di selezione file unificato per Dropbox e OneDrive
 window._closeCloudPick = function() {
@@ -2073,14 +1963,13 @@ window._pickCloud = function(btn) {
   const idx    = parseInt(btn.getAttribute('data-idx'), 10);
   const f      = (window._cloudFiles || [])[idx];
   if (!f) { toast('Errore: file non trovato nella lista', 'error'); return; }
-  const token  = method === 'dropbox' ? (SETTINGS.dropbox_token || '') : (SETTINGS.onedrive_token || '');
+  const token  = SETTINGS.dropbox_token || '';
   if (method === 'dropbox') _downloadDropboxFile(f.path, f.name, token);
-  else                      _downloadOneDriveFile(f.id,  f.name, token);
 };
 
 function _showCloudPickModal(files, method, token) {
-  const col    = method === 'dropbox' ? '#0061ff' : '#0078d4';
-  const label  = method === 'dropbox' ? 'Dropbox' : 'OneDrive';
+  const col    = '#0061ff';
+  const label  = 'Dropbox';
   const icon   = method === 'dropbox'
     ? '<svg viewBox="0 0 43.1 40.5" width="18" height="18"><path fill="#0061ff" d="M12.8 0L0 8.2l12.8 8.2 12.8-8.2zM38.3 0L25.5 8.2l12.8 8.2 12.8-8.2zM0 24.7l12.8 8.2 12.8-8.2-12.8-8.2zM38.3 16.5l-12.8 8.2 12.8 8.2 12.8-8.2zM12.8 28.1l12.8 8.2 12.8-8.2-12.8-8.2z"/></svg>'
     : '<svg viewBox="0 0 32 32" width="18" height="18"><path d="M19.2 12.8A7.2 7.2 0 006.4 16H6a6 6 0 000 12h20a5 5 0 000-10 4.98 4.98 0 00-1.1.12A7.2 7.2 0 0019.2 12.8z" fill="#0078d4"/></svg>';
@@ -2221,25 +2110,6 @@ function _dropboxUploadDirect(blob, fname, token) {
 
 
 // ── OneDrive ─────────────────────────────────────────────────────────────
-function saveToOneDrive(blob, fname) {
-  const token = SETTINGS.onedrive_token;
-  if (!token) { toast('Token OneDrive non configurato — vai in Impostazioni', 'error'); return; }
-  blob.arrayBuffer().then(buf => {
-    fetch('https://graph.microsoft.com/v1.0/me/drive/special/approot:/' + fname + ':/content', {
-      method: 'PUT',
-      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: buf
-    }).then(r => r.json()).then(data => {
-      if (data.id) {
-        save(); markSaved();
-        toast('\u2713 Salvato su OneDrive: ' + fname);
-      } else {
-        toast('Errore OneDrive: ' + (data.error && data.error.message || 'token scaduto'), 'error');
-      }
-    }).catch(e => toast('Errore rete OneDrive: ' + e.message, 'error'));
-  });
-}
-
 function handleSessionFile(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -2665,7 +2535,8 @@ if (window._showAllClients === undefined) window._showAllClients = false;
     const k = r.dataObj.getFullYear() + '-' + String(r.dataObj.getMonth()+1).padStart(2,'0');
     monthly[k] = (monthly[k] || 0) + r.importo;
   });
-  const months = Object.keys(monthly).sort().slice(-24);
+  // Nessun limite artificiale: mostra tutti i mesi del periodo selezionato
+  const months = Object.keys(monthly).sort();
 
   // ── Top clienti ───────────────────────────────────────────
   const byClient = {};
@@ -3078,7 +2949,8 @@ function _buildMonthlyChart(filteredRows, allRows_, filteredAll) {
     const k = r.dataObj.getFullYear() + '-' + String(r.dataObj.getMonth()+1).padStart(2,'0');
     monthly[k] = (monthly[k]||0) + r.importo;
   });
-  const months      = Object.keys(monthly).sort().slice(-24);
+  // Nessun limite: tutti i mesi del periodo selezionato (quick filter già applica il suo range)
+  const months      = Object.keys(monthly).sort();
   const monthValues = months.map(k => monthly[k]||0);
 
   let labels, datasets, showLegend = false, compareActive = false;
@@ -3153,7 +3025,18 @@ function _buildMonthlyChart(filteredRows, allRows_, filteredAll) {
         tooltip: { callbacks: { title: ctx => ctx[0].label, label: ctx => '  ' + ctx.dataset.label + ':  ' + fmtEur(ctx.raw) } }
       },
       scales: {
-        x: { ticks: { color: '#7a8099', font: { size: 10 } }, grid: { display: false } },
+        x: {
+          ticks: {
+            color: '#7a8099',
+            font: { size: 10 },
+            maxRotation: 45,
+            minRotation: 0,
+            maxTicksLimit: months.length <= 24 ? months.length
+                         : months.length <= 60  ? Math.ceil(months.length / 3)
+                         : Math.ceil(months.length / 6)
+          },
+          grid: { display: false }
+        },
         y: { ticks: { color: '#7a8099', font: { size: 10 }, callback: v => fmtK(v) }, grid: { color: 'rgba(255,255,255,0.05)' } }
       }
     }
@@ -3501,7 +3384,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.23 - 10:18</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.23 - 12:13</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -4233,7 +4116,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260223-101857';
+const APP_VERSION = '20260223-121351';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
