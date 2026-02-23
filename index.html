@@ -806,7 +806,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.82);color:rgba(255,255,255,0.82);font-weight:700">Andrea Muraro</strong></div>
-          <div id="header-version">v 2026.02.23 - 07:44</div>
+          <div id="header-version">v 2026.02.23 - 07:52</div>
         </div>
       </div>
       <div class="header-actions">
@@ -1472,9 +1472,9 @@ function renderSavePathSection() {
               + '<svg viewBox="0 0 43.1 40.5" width="14" height="14"><path fill="#4da8ff" d="M12.8 0L0 8.2l12.8 8.2 12.8-8.2zM38.3 0L25.5 8.2l12.8 8.2 12.8-8.2zM0 24.7l12.8 8.2 12.8-8.2-12.8-8.2zM38.3 16.5l-12.8 8.2 12.8 8.2 12.8-8.2zM12.8 28.1l12.8 8.2 12.8-8.2-12.8-8.2z"/></svg>'
               + '🔑 Avvia autorizzazione Dropbox'
             + '</button>'
-            + '<div style="font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:8px">Dopo aver autorizzato, Dropbox ti mostra una pagina con un URL tipo <em>https://localhost?code=XXXX</em> — copia quell&#39;intero URL e incollalo qui sotto.</div>'
+            + '<div style="font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:8px">Dopo aver cliccato Consenti, Dropbox mostrer\u00e0 una pagina con un <strong style="color:rgba(255,255,255,0.65)">codice di accesso</strong>. Copia quel codice (solo il codice, non un URL) e incollalo nel campo qui sotto.</div>'
             + '<div style="display:flex;gap:6px">'
-              + '<input id="sett-db-callbackurl" type="text" placeholder="Incolla l&#39;URL completo ricevuto da Dropbox..." style="flex:1;padding:8px 12px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.3);color:#fff;font-size:11px">'
+              + '<input id="sett-db-callbackurl" type="text" placeholder="Incolla qui il codice mostrato da Dropbox..." style="flex:1;padding:8px 12px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.3);color:#fff;font-size:11px">'
               + '<button onclick="window._extractDropboxCode()" style="padding:8px 12px;border-radius:8px;background:rgba(76,175,130,0.2);border:1.5px solid rgba(76,175,130,0.5);color:#4caf82;font-weight:700;font-size:11px;cursor:pointer;white-space:nowrap">→ Scambia</button>'
             + '</div>'
             // Refresh token manuale (alternativa)
@@ -1568,13 +1568,13 @@ window._startDropboxOAuth = function() {
     toast('Inserisci prima l&#39;App Key (Passo 1)', 'error');
     return;
   }
+  // Senza redirect_uri: Dropbox mostra il codice direttamente a schermo
   const authUrl = 'https://www.dropbox.com/oauth2/authorize'
     + '?client_id=' + encodeURIComponent(appKey.trim())
     + '&response_type=code'
-    + '&token_access_type=offline'
-    + '&redirect_uri=https://localhost';
+    + '&token_access_type=offline';
   window.open(authUrl, '_blank');
-  toast('Dopo aver autorizzato, copia l\'URL completo della pagina di errore e incollalo nel campo qui sotto', 'info');
+  toast('Dropbox si apre nel browser. Clicca Consenti, poi copia il codice mostrato e incollalo nel campo qui sotto', 'info');
 };
 
 // Estrae il code dall'URL incollato e lo scambia per access+refresh token
@@ -1586,17 +1586,21 @@ window._extractDropboxCode = async function() {
   if (!urlInput.trim()) { toast('Incolla prima l&#39;URL ricevuto da Dropbox', 'error'); return; }
   if (!appKey || !appSecret) { toast('Inserisci App Key e App Secret (Passo 1)', 'error'); return; }
 
-  // Estrai il code dall'URL
-  let code = '';
-  try {
-    const u = new URL(urlInput.trim());
-    code = u.searchParams.get('code') || '';
-  } catch(e) {
-    // Prova match diretto
-    const m = urlInput.match(/[?&]code=([^&]+)/);
-    if (m) code = m[1];
+  // Accetta sia il codice puro che un URL contenente code=...
+  let code = urlInput.trim();
+  if (code.includes('?') || code.includes('&')) {
+    // È un URL: estrai il parametro code
+    try {
+      const u = new URL(code);
+      code = u.searchParams.get('code') || '';
+    } catch(e) {
+      const m = code.match(/[?&]code=([^&\s]+)/);
+      code = m ? m[1] : '';
+    }
   }
-  if (!code) { toast('Codice non trovato nell\'URL — assicurati di aver copiato l\'URL completo', 'error'); return; }
+  // Rimuovi eventuali spazi o caratteri extra
+  code = code.replace(/[\s\n\r]/g, '');
+  if (!code) { toast('Codice non valido — copia il codice mostrato da Dropbox e incollalo qui', 'error'); return; }
 
   toast('⏳ Scambio codice in corso...');
   try {
@@ -1607,8 +1611,7 @@ window._extractDropboxCode = async function() {
         code:          code,
         grant_type:    'authorization_code',
         client_id:     appKey.trim(),
-        client_secret: appSecret.trim(),
-        redirect_uri:  'https://localhost'
+        client_secret: appSecret.trim()
       })
     });
     const data = await resp.json();
@@ -3391,7 +3394,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.23 - 07:44</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.23 - 07:52</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -4051,7 +4054,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260223-074455';
+const APP_VERSION = '20260223-075217';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
