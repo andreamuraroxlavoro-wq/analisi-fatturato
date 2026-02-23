@@ -806,7 +806,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.82);color:rgba(255,255,255,0.82);font-weight:700">Andrea Muraro</strong></div>
-          <div id="header-version">v 2026.02.23 - 00:23</div>
+          <div id="header-version">v 2026.02.23 - 07:35</div>
         </div>
       </div>
       <div class="header-actions">
@@ -889,12 +889,16 @@ let _unsavedChanges = false;
 
 // ── SETTINGS ──────────────────────────────────────────────
 let SETTINGS = {
-  fileName:        'DB_Analisi_Fatturato_PRO',
-  autoSave:        false,
-  saveMethod:      '',       // 'dropbox' | 'onedrive' | 'local' | ''
-  dropbox_token:   '',
-  onedrive_token:  '',
-  fileCounter:     1         // progressivo per i nuovi file
+  fileName:            'DB_Analisi_Fatturato_PRO',
+  autoSave:            false,
+  saveMethod:          '',       // 'dropbox' | 'onedrive' | 'local' | ''
+  dropbox_token:       '',       // access token corrente (si aggiorna automaticamente)
+  dropbox_refresh:     '',       // refresh token (permanente)
+  dropbox_app_key:     '',       // App Key dalla console Dropbox
+  dropbox_app_secret:  '',       // App Secret dalla console Dropbox
+  dropbox_token_exp:   0,        // timestamp ms scadenza access token
+  onedrive_token:      '',
+  fileCounter:         1         // progressivo per i nuovi file
 };
 // Handle cartella locale (Chrome File System API) — non serializzabile, tenuto in memoria
 let _dirHandle = null;
@@ -906,6 +910,51 @@ let _dirHandle = null;
 })();
 function saveSettings() {
   try { localStorage.setItem('vendite_pro_settings', JSON.stringify(SETTINGS)); } catch(e) {}
+}
+
+// ── Dropbox OAuth: restituisce sempre un access token valido ──────────────
+// Se il token è scaduto (o scadrà entro 5 min) lo rinnova tramite refresh_token
+async function _getValidDropboxToken() {
+  const now = Date.now();
+  const MARGIN = 5 * 60 * 1000; // 5 minuti di margine
+
+  // Caso 1: token ancora valido
+  if (SETTINGS.dropbox_token && SETTINGS.dropbox_token_exp && (SETTINGS.dropbox_token_exp - now) > MARGIN) {
+    return SETTINGS.dropbox_token;
+  }
+
+  // Caso 2: abbiamo refresh_token + credenziali → rinnova
+  if (SETTINGS.dropbox_refresh && SETTINGS.dropbox_app_key && SETTINGS.dropbox_app_secret) {
+    try {
+      const resp = await fetch('https://api.dropbox.com/oauth2/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type:    'refresh_token',
+          refresh_token: SETTINGS.dropbox_refresh,
+          client_id:     SETTINGS.dropbox_app_key,
+          client_secret: SETTINGS.dropbox_app_secret
+        })
+      });
+      const data = await resp.json();
+      if (data.access_token) {
+        SETTINGS.dropbox_token     = data.access_token;
+        SETTINGS.dropbox_token_exp = now + (data.expires_in || 14400) * 1000;
+        saveSettings();
+        return SETTINGS.dropbox_token;
+      } else {
+        const err = data.error_description || data.error || 'Errore rinnovo token';
+        throw new Error(err);
+      }
+    } catch(e) {
+      throw new Error('Impossibile rinnovare il token Dropbox: ' + e.message);
+    }
+  }
+
+  // Caso 3: solo access token manuale (vecchio metodo, nessun refresh)
+  if (SETTINGS.dropbox_token) return SETTINGS.dropbox_token;
+
+  throw new Error('Nessun token Dropbox configurato — vai in Impostazioni');
 }
 
 function markUnsaved() {
@@ -1104,24 +1153,25 @@ function _syncCloudCounter(method) {
   };
 
   if (method === 'dropbox') {
-    const token = SETTINGS.dropbox_token;
-    if (!token) return Promise.resolve();
-    const tryList = path => fetch('https://api.dropboxapi.com/2/files/list_folder', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: path, recursive: false })
-    }).then(r => r.json());
+    return (async () => {
+      let token;
+      try { token = await _getValidDropboxToken(); } catch(e) { return; }
+      const tryList = path => fetch('https://api.dropboxapi.com/2/files/list_folder', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: path, recursive: false })
+      }).then(async r => { const t = await r.text(); try { return JSON.parse(t); } catch(e) { return {}; } });
 
-    return tryList('')
-      .then(data => data.error_summary ? tryList('/AnalisiFatturatoPRO') : data)
-      .then(data => {
+      try {
+        let data = await tryList('');
+        if (!data || data.error_summary) data = await tryList('/AnalisiFatturatoPRO');
         if (!data || !data.entries) return;
         syncCounter(parseFiles(data.entries.map(f => ({
           name: f.name, num: extractNum(f.name),
           modified: f.server_modified || f.client_modified || null
         }))));
-      })
-      .catch(() => {});
+      } catch(e) {}
+    })();
   }
 
   if (method === 'onedrive') {
@@ -1400,7 +1450,19 @@ function renderSavePathSection() {
       '<input id="sett-token-input" type="password" placeholder="Incolla qui il token..." value="' + (SETTINGS[m + '_token'] || '') + '" style="flex:1;padding:10px 12px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff;font-size:13px">' +
       '<button onclick="saveCloudToken()" style="padding:10px 16px;border-radius:10px;background:rgba(226,184,74,0.2);border:1.5px solid rgba(226,184,74,0.5);color:#e2b84a;font-weight:700;font-size:12px;cursor:pointer">Salva</button>' +
       '</div>' +
-      '<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:' + (hasTokenSvc ? '#4caf82' : 'rgba(255,255,255,0.3)') + '">' +
+      (isDropbox ? (
+        '<div style="margin-top:10px;padding:12px;background:rgba(0,97,255,0.07);border:1px solid rgba(0,97,255,0.25);border-radius:10px">' +
+        '<div style="font-size:10px;font-weight:800;color:#4caf82;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">🔄 Rinnovo automatico (consigliato)</div>' +
+        '<div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:8px">Inserisci App Key, App Secret e Refresh Token per rinnovare il token automaticamente senza doverlo ricopiare ogni 4 ore.</div>' +
+        '<div style="display:flex;flex-direction:column;gap:6px">' +
+        '<input id="sett-db-appkey" type="text" placeholder="App Key" value="' + (SETTINGS.dropbox_app_key || '') + '" style="padding:8px 12px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.3);color:#fff;font-size:12px;font-family:monospace">' +
+        '<input id="sett-db-appsecret" type="password" placeholder="App Secret" value="' + (SETTINGS.dropbox_app_secret || '') + '" style="padding:8px 12px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.3);color:#fff;font-size:12px;font-family:monospace">' +
+        '<input id="sett-db-refresh" type="password" placeholder="Refresh Token" value="' + (SETTINGS.dropbox_refresh || '') + '" style="padding:8px 12px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.3);color:#fff;font-size:12px;font-family:monospace">' +
+        '<button onclick="saveDropboxOAuth()" style="padding:9px;border-radius:8px;background:rgba(0,97,255,0.2);border:1.5px solid rgba(0,97,255,0.5);color:#4da8ff;font-weight:700;font-size:12px;cursor:pointer">💾 Salva credenziali OAuth</button>' +
+        (SETTINGS.dropbox_refresh ? '<div style="font-size:10px;color:#4caf82;margin-top:2px">✓ Rinnovo automatico attivo</div>' : '') +
+        '</div></div>'
+      ) : '') +
+      '<div style="display:flex;align-items:center;gap:6px;font-size:11px;margin-top:8px;color:' + (hasTokenSvc ? '#4caf82' : 'rgba(255,255,255,0.3)') + '">' +
       '<span style="width:6px;height:6px;border-radius:50%;background:' + (hasTokenSvc ? '#4caf82' : 'rgba(255,255,255,0.2)') + '"></span>' +
       (hasTokenSvc ? '&#10003; Token presente' : 'Nessun token — clicca &quot;Come ottenere il Token&quot; per iniziare') +
       '</div></div>';
@@ -1468,8 +1530,27 @@ function saveCloudToken() {
   if (!inp) return;
   const key = SETTINGS.saveMethod + '_token';
   SETTINGS[key] = inp.value.trim();
+  SETTINGS[SETTINGS.saveMethod + '_token_exp'] = 0; // forza ri-validazione
   saveSettings();
-  toast('\u2713 Token salvato');
+  toast('✓ Token salvato');
+  _renderSaveSettings();
+}
+
+function saveDropboxOAuth() {
+  const appKey    = (document.getElementById('sett-db-appkey')    || {}).value || '';
+  const appSecret = (document.getElementById('sett-db-appsecret') || {}).value || '';
+  const refresh   = (document.getElementById('sett-db-refresh')   || {}).value || '';
+  if (!appKey || !appSecret || !refresh) {
+    toast('Compila tutti e tre i campi: App Key, App Secret e Refresh Token', 'error');
+    return;
+  }
+  SETTINGS.dropbox_app_key    = appKey.trim();
+  SETTINGS.dropbox_app_secret = appSecret.trim();
+  SETTINGS.dropbox_refresh    = refresh.trim();
+  SETTINGS.dropbox_token_exp  = 0; // forza rinnovo immediato al prossimo uso
+  saveSettings();
+  toast('✓ Credenziali OAuth salvate — il token si rinnoverà automaticamente');
+  _renderSaveSettings();
 }
 
 window._showDropboxGuide = function() {
@@ -1493,14 +1574,18 @@ window._showDropboxGuide = function() {
       { n:'3', title:'Imposta i permessi',
         desc:'Nella pagina della tua app clicca la scheda <strong style="color:#fff">Permissions</strong>. Spunta <strong style="color:#e2b84a">files.content.write</strong> e <strong style="color:#e2b84a">files.content.read</strong>. Clicca <strong style="color:#fff">Submit</strong> in fondo.',
         action:'', note:'' },
-      { n:'4', title:'Genera il token',
-        desc:'Torna alla scheda <strong style="color:#fff">Settings</strong>. Scorri fino a <strong style="color:#fff">OAuth 2</strong> → sezione <strong style="color:#fff">Generated access token</strong>. Clicca <strong style="color:#fff">Generate</strong>.',
-        action:'', note:'⏱️ Il token Dropbox non scade (a meno che non lo revochi tu). Una volta generato è permanente.' },
-      { n:'5', title:'Copia e incolla il token',
-        desc:'Copia il token generato e incollalo nel campo <strong style="color:#e2b84a">Token di accesso Dropbox</strong> nell&#39;app, poi clicca <strong style="color:#fff">Salva</strong>.',
-        action:'', note:'✅ Da questo momento i file vengono salvati in <strong style="color:#fff">Dropbox/Apps/AnalisiFatturatoPRO/</strong>' }
+      { n:'4', title:'Copia App Key e App Secret',
+        desc:'Nella scheda <strong style="color:#fff">Settings</strong> trova i campi <strong style="color:#e2b84a">App key</strong> e <strong style="color:#e2b84a">App secret</strong>. Copiali entrambi e incollali nei campi corrispondenti in Impostazioni → sezione <strong style="color:#fff">Rinnovo automatico</strong>.',
+        action:'', note:'💡 App key e App secret sono le credenziali della tua app — non cambiano mai.' },
+      { n:'5', title:'Ottieni il Refresh Token',
+        desc:'Sempre nella scheda Settings, scorri fino a <strong style="color:#fff">OAuth 2</strong>. Clicca il pulsante qui sotto per avviare il flusso di autorizzazione. Accedi con il tuo account Dropbox e <strong style="color:#e2b84a">copia il codice</strong> che appare alla fine. Poi usa questo codice per ottenere il Refresh Token con la chiamata mostrata di seguito.',
+        action:'<div style="background:rgba(0,0,0,0.4);border-radius:8px;padding:10px 14px;font-family:monospace;font-size:10px;color:#a8d8a8;word-break:break-all;margin-top:8px">1. Apri nel browser:<br>https://www.dropbox.com/oauth2/authorize?client_id=TUA_APP_KEY&response_type=code&token_access_type=offline<br><br>2. Dopo l&#39;autorizzazione ricevi un CODE.<br><br>3. Esegui questa chiamata (da terminale o Postman):<br>POST https://api.dropbox.com/oauth2/token<br>body: code=CODE, grant_type=authorization_code, client_id=APP_KEY, client_secret=APP_SECRET<br><br>4. Nella risposta trovi <strong style="color:#e2b84a">refresh_token</strong> — incollalo in Impostazioni.</div>',
+        note:'⚠️ Il refresh_token non scade mai — salvalo in modo sicuro.' },
+      { n:'6', title:'Salva le credenziali nell&#39;app',
+        desc:'In Impostazioni → sezione <strong style="color:#fff">Rinnovo automatico</strong> incolla i tre valori: <strong style="color:#e2b84a">App Key</strong>, <strong style="color:#e2b84a">App Secret</strong> e <strong style="color:#e2b84a">Refresh Token</strong>. Clicca <strong style="color:#fff">Salva credenziali OAuth</strong>.',
+        action:'', note:'✅ Da ora il token si rinnova automaticamente ogni 4 ore. Non dovrai più fare nulla.' }
     ],
-    footer: { icon:'💙', text:'<strong style="color:#0061ff">Vantaggio Dropbox:</strong> il token non scade mai — configuralo una volta sola e funzionerà per sempre.' }
+    footer: { icon:'🔄', text:'<strong style="color:#0061ff">Rinnovo automatico:</strong> con App Key + App Secret + Refresh Token il token si rinnova da solo ogni 4 ore — nessuna azione richiesta da te.' }
   });
 };
 
@@ -1640,10 +1725,11 @@ function _applyLoadedData(result, sourceName) {
 }
 
 function loadFromDropbox() {
-  const token = (SETTINGS.dropbox_token || '').trim();
-  if (!token) { toast('Token Dropbox non configurato — vai in Impostazioni', 'error'); return; }
   toast('⏳ Ricerca file su Dropbox...');
+  _getValidDropboxToken().then(token => _loadFromDropboxWithToken(token)).catch(e => toast(e.message, 'error'));
+}
 
+function _loadFromDropboxWithToken(token) {
   // Wrapper sicuro: legge sempre il body come testo, poi tenta JSON
   const dbFetch = (url, opts) => fetch(url, opts).then(async r => {
     const txt = await r.text();
@@ -1695,8 +1781,10 @@ function loadFromDropbox() {
     .catch(e => toast('Errore Dropbox: ' + (e.message || 'controlla il token'), 'error'));
 }
 
-function _downloadDropboxFile(path, fname, token) {
+async function _downloadDropboxFile(path, fname, tokenArg) {
   toast('⏳ Caricamento ' + fname + '...');
+  let token;
+  try { token = tokenArg || await _getValidDropboxToken(); } catch(e) { toast(e.message, 'error'); return; }
   fetch('https://content.dropboxapi.com/2/files/download', {
     method: 'POST',
     headers: {
@@ -1780,7 +1868,7 @@ window._pickCloud = function(btn) {
   const idx    = parseInt(btn.getAttribute('data-idx'), 10);
   const f      = (window._cloudFiles || [])[idx];
   if (!f) { toast('Errore: file non trovato nella lista', 'error'); return; }
-  const token  = method === 'dropbox' ? SETTINGS.dropbox_token : SETTINGS.onedrive_token;
+  const token  = method === 'dropbox' ? (SETTINGS.dropbox_token || '') : (SETTINGS.onedrive_token || '');
   if (method === 'dropbox') _downloadDropboxFile(f.path, f.name, token);
   else                      _downloadOneDriveFile(f.id,  f.name, token);
 };
@@ -1828,9 +1916,9 @@ function _showCloudPickModal(files, method, token) {
   el.addEventListener('click', e => { if (e.target === el) el.remove(); });
 }
 
-function saveToDropbox(blob, fname) {
-  const token = SETTINGS.dropbox_token;
-  if (!token) { toast('Token Dropbox non configurato — vai in Impostazioni', 'error'); return; }
+async function saveToDropbox(blob, fname) {
+  let token;
+  try { token = await _getValidDropboxToken(); } catch(e) { toast(e.message, 'error'); return; }
 
   // Step 1: verifica spazio disponibile e validità token
   fetch('https://api.dropboxapi.com/2/users/get_space_usage', {
@@ -1838,10 +1926,13 @@ function saveToDropbox(blob, fname) {
     headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
     body: 'null'
   })
-  .then(r => r.json())
+  .then(async r => {
+    const txt = await r.text();
+    try { return JSON.parse(txt); } catch(e) { return {}; }
+  })
   .then(usage => {
     if (usage.error_summary) {
-      toast('Token Dropbox non valido — rigeneralo in Impostazioni', 'error');
+      toast('Token Dropbox non valido — controlla le credenziali OAuth in Impostazioni', 'error');
       console.error('[AFP] Token check:', usage);
       return;
     }
@@ -3205,7 +3296,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.23 - 00:23</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.23 - 07:35</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -3865,7 +3956,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260223-002333';
+const APP_VERSION = '20260223-073527';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
