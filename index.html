@@ -806,7 +806,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.82);color:rgba(255,255,255,0.82);font-weight:700">Andrea Muraro</strong></div>
-          <div id="header-version">v 2026.02.22 - 23:51</div>
+          <div id="header-version">v 2026.02.23 - 00:13</div>
         </div>
       </div>
       <div class="header-actions">
@@ -1640,53 +1640,90 @@ function _applyLoadedData(result, sourceName) {
 }
 
 function loadFromDropbox() {
-  const token = SETTINGS.dropbox_token;
+  const token = (SETTINGS.dropbox_token || '').trim();
   if (!token) { toast('Token Dropbox non configurato — vai in Impostazioni', 'error'); return; }
-  toast('\u23f3 Ricerca file su Dropbox...');
+  toast('⏳ Ricerca file su Dropbox...');
 
-  const tryList = path => fetch('https://api.dropboxapi.com/2/files/list_folder', {
+  // Wrapper sicuro: legge sempre il body come testo, poi tenta JSON
+  const dbFetch = (url, opts) => fetch(url, opts).then(async r => {
+    const txt = await r.text();
+    let json;
+    try { json = JSON.parse(txt); } catch(e) { json = null; }
+    if (!r.ok) {
+      const msg = (json && json.error_summary) ? json.error_summary
+                : (json && json.error && json.error['.tag']) ? json.error['.tag']
+                : ('HTTP ' + r.status);
+      throw new Error(msg);
+    }
+    return json;
+  });
+
+  const tryList = path => dbFetch('https://api.dropboxapi.com/2/files/list_folder', {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
     body: JSON.stringify({ path: path, recursive: false })
-  }).then(r => r.json());
+  });
 
+  // Prova prima App Folder root (''), poi cartella nominale come fallback
   tryList('')
-  .then(data => data.error_summary ? tryList('/AnalisiFatturatoPRO') : data)
-  .then(data => {
-    if (!data || !data.entries) { toast('Errore lettura Dropbox', 'error'); return; }
-    const base = 'DB_Analisi_Fatturato_PRO';
-    const extractNum = name => { const m = name.match(/DB_Analisi_Fatturato_PRO_(\d+)\.json$/i); return m ? parseInt(m[1],10) : 0; };
-    const files = data.entries
-      .filter(f => f['.tag'] === 'file' && f.name.startsWith(base))
-      .map(f => ({ name: f.name, num: extractNum(f.name), path: f.path_lower, modified: f.server_modified || f.client_modified || null }))
-      .filter(f => f.num > 0)
-      .sort((a, b) => a.modified && b.modified ? new Date(b.modified) - new Date(a.modified) : b.num - a.num);
+    .catch(() => tryList('/AnalisiFatturatoPRO'))
+    .then(data => {
+      if (!data || !Array.isArray(data.entries)) {
+        toast('Errore lettura Dropbox: risposta inattesa', 'error');
+        return;
+      }
+      const base = 'DB_Analisi_Fatturato_PRO';
+      const extractNum = name => { const m = name.match(/DB_Analisi_Fatturato_PRO_(\d+)\.json$/i); return m ? parseInt(m[1],10) : 0; };
+      const files = data.entries
+        .filter(f => f['.tag'] === 'file' && f.name.startsWith(base))
+        .map(f => ({ name: f.name, num: extractNum(f.name), path: f.path_lower, modified: f.server_modified || f.client_modified || null }))
+        .filter(f => f.num > 0)
+        .sort((a, b) => a.modified && b.modified ? new Date(b.modified) - new Date(a.modified) : b.num - a.num);
 
-    if (!files.length) { toast('Nessun file trovato su Dropbox', 'error'); return; }
+      if (!files.length) { toast('Nessun file trovato su Dropbox', 'error'); return; }
 
-    // Sincronizza fileCounter con il numero più alto trovato
-    const cloudMax = Math.max(...files.map(f => f.num));
-    if (cloudMax > (SETTINGS.fileCounter || 1)) { SETTINGS.fileCounter = cloudMax; saveSettings(); }
-    window._cloudFiles = files;
+      const cloudMax = Math.max(...files.map(f => f.num));
+      if (cloudMax > (SETTINGS.fileCounter || 1)) { SETTINGS.fileCounter = cloudMax; saveSettings(); }
+      window._cloudFiles = files;
 
-    if (files.length === 1) {
-      _downloadDropboxFile(files[0].path, files[0].name, token);
-    } else {
-      _showCloudPickModal(files, 'dropbox', token);
-    }
-  })
-  .catch(e => toast('Errore rete Dropbox: ' + e.message, 'error'));
+      if (files.length === 1) {
+        _downloadDropboxFile(files[0].path, files[0].name, token);
+      } else {
+        _showCloudPickModal(files, 'dropbox', token);
+      }
+    })
+    .catch(e => toast('Errore Dropbox: ' + (e.message || 'controlla il token'), 'error'));
 }
 
 function _downloadDropboxFile(path, fname, token) {
-  toast('\u23f3 Caricamento ' + fname + '...');
+  toast('⏳ Caricamento ' + fname + '...');
   fetch('https://content.dropboxapi.com/2/files/download', {
     method: 'POST',
-    headers: { Authorization: 'Bearer ' + token, 'Dropbox-API-Arg': JSON.stringify({ path: path }) }
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Dropbox-API-Arg': JSON.stringify({ path: path })
+    }
   })
-  .then(r => r.text())
-  .then(txt => { _applyLoadedData(_parsePayload(txt), fname); })
-  .catch(e => toast('Errore download Dropbox: ' + e.message, 'error'));
+  .then(async r => {
+    const txt = await r.text();
+    if (!r.ok) {
+      // Dropbox restituisce errori JSON nell'header Dropbox-API-Result o nel body
+      let errMsg = 'HTTP ' + r.status;
+      try {
+        const j = JSON.parse(txt);
+        if (j.error_summary) errMsg = j.error_summary;
+        else if (j.error && j.error['.tag']) errMsg = j.error['.tag'];
+      } catch(e) {}
+      throw new Error(errMsg);
+    }
+    return txt;
+  })
+  .then(txt => {
+    const parsed = _parsePayload(txt);
+    if (!parsed) throw new Error('File non valido o corrotto');
+    _applyLoadedData(parsed, fname);
+  })
+  .catch(e => toast('Errore download Dropbox: ' + (e.message || 'file non leggibile'), 'error'));
 }
 
 function loadFromOneDrive() {
@@ -3347,7 +3384,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.22 - 23:51</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.23 - 00:13</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -4007,7 +4044,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260222-235157';
+const APP_VERSION = '20260223-001326';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
