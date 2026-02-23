@@ -869,7 +869,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.82);color:rgba(255,255,255,0.82);font-weight:700">Andrea Muraro</strong></div>
-          <div id="header-version">v 2026.02.23 - 12:36</div>
+          <div id="header-version">v 2026.02.23 - 12:47</div>
         </div>
       </div>
       <div class="header-actions">
@@ -2373,7 +2373,8 @@ const COMM_PALETTE = [
 ];
 function commColor(commList, comm) {
   const idx = commList.indexOf(comm);
-  return COMM_PALETTE[idx % COMM_PALETTE.length];
+  const safeIdx = idx >= 0 ? idx : 0;
+  return COMM_PALETTE[safeIdx % COMM_PALETTE.length];
 }
 
 // Helper: costruisce le righe della lista clienti Dashboard con badge commerciale
@@ -2483,6 +2484,7 @@ if (window._showAllClients === undefined) window._showAllClients = false;
 
   // ── Anni disponibili dai dati ─────────────────────────────
   const anniDisp = [...new Set(rows.filter(r=>r.dataObj).map(r=>r.dataObj.getFullYear()))].sort((a,b)=>a-b);
+  const commsDisp = [...new Set(rows.map(r=>r.commerciale||'').filter(Boolean).filter(c=>c!=='—'))].sort();
 
   // ── Filtro commerciale (array per multi-selezione) ────────────
   if (!window._dfComm) window._dfComm = [];
@@ -3014,19 +3016,24 @@ function _buildMonthlyChart(filteredRows, allRows_, filteredAll) {
 
   if (compareComm) {
     compareActive = true; showLegend = true;
-    const mesiPresenti = [...new Set(
-      (allRows_||allRows()).filter(r => r.dataObj && dfComm.includes(r.commerciale||'')).map(r => r.dataObj.getMonth())
-    )].sort((a,b)=>a-b);
-    labels = mesiPresenti.map(m => MESI[m]);
+    // Usa chiavi anno-mese per evitare sovrapposizioni su periodi pluriennali
+    const allMonthKeys = [...new Set(
+      filteredRows.filter(r => r.dataObj).map(r =>
+        r.dataObj.getFullYear() + '-' + String(r.dataObj.getMonth()+1).padStart(2,'0')
+      )
+    )].sort();
+    labels = allMonthKeys.map(k => { const [y,mo] = k.split('-'); return MESI[parseInt(mo)-1]+" '"+y.slice(2); });
     datasets = dfComm.map(comm => {
       const c = commColor(commsDisp, comm);
-      const byMese = {};
+      const byKey = {};
       filteredRows.filter(r => r.dataObj && (r.commerciale||'') === comm).forEach(r => {
-        const mo = r.dataObj.getMonth();
-        byMese[mo] = (byMese[mo]||0) + r.importo;
+        const k = r.dataObj.getFullYear() + '-' + String(r.dataObj.getMonth()+1).padStart(2,'0');
+        byKey[k] = (byKey[k]||0) + r.importo;
       });
-      return { label: comm, data: mesiPresenti.map(m => byMese[m]||0),
-               backgroundColor: c.bg.replace('0.18','0.78'), borderColor: c.border, borderWidth: 1, borderRadius: 4 };
+      return { label: comm, data: allMonthKeys.map(k => byKey[k]||0),
+               backgroundColor: c && c.bg ? c.bg.replace('0.18','0.78') : 'rgba(201,168,76,0.78)',
+               borderColor: c && c.border ? c.border : '#c9a84c',
+               borderWidth: 1, borderRadius: 4 };
     });
 
   } else if (compareAnni) {
@@ -3441,7 +3448,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.23 - 12:36</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.23 - 12:47</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -4173,7 +4180,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260223-123627';
+const APP_VERSION = '20260223-124733';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
