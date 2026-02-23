@@ -869,7 +869,7 @@
         <div class="app-title-block">
           <div class="app-title">Analisi Fatturato<span class="title-pro">PRO</span></div>
           <div class="header-subtitle">Applicazione sviluppata da <strong style="-webkit-text-fill-color:rgba(255,255,255,0.82);color:rgba(255,255,255,0.82);font-weight:700">Andrea Muraro</strong></div>
-          <div id="header-version">v 2026.02.23 - 13:12</div>
+          <div id="header-version">v 2026.02.23 - 13:18</div>
         </div>
       </div>
       <div class="header-actions">
@@ -3079,19 +3079,15 @@ function _buildMonthlyChart(filteredRows, allRows_, filteredAll) {
   if (chartInstances['monthly']) { try { chartInstances['monthly'].destroy(); } catch(e){} delete chartInstances['monthly']; }
 
 
-  // Plugin pill per assi X e Y
+  // Plugin pill solo per asse X
   const pillAxisPlugin = {
     id: 'pillAxis',
     afterDraw(chart) {
       const ctx = chart.ctx;
       const xAxis = chart.scales.x;
-      const yAxis = chart.scales.y;
       const PILL_H = 18, PILL_PAD = 9, R = 9;
-      const FONT = '700 10px DM Sans,sans-serif';
-
-      // ── Asse X: pill centrate sotto ogni tick ─────────────────
       ctx.save();
-      ctx.font = FONT;
+      ctx.font = '700 10px DM Sans,sans-serif';
       xAxis.ticks.forEach((tick, i) => {
         const lbl = Array.isArray(tick.label) ? tick.label.join(' ') : tick.label;
         if (!lbl) return;
@@ -3105,39 +3101,10 @@ function _buildMonthlyChart(filteredRows, allRows_, filteredAll) {
         ctx.strokeStyle = 'rgba(255,255,255,0.18)';
         ctx.lineWidth = 1;
         ctx.stroke();
-        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.fillStyle = 'rgba(255,255,255,0.82)';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(lbl, x, y + PILL_H / 2);
-      });
-      ctx.restore();
-
-      // ── Asse Y: pill allineate al bordo sinistro del canvas ───
-      ctx.save();
-      ctx.font = FONT;
-      // Calcola larghezza massima per allineare tutte le pill
-      let maxW = 0;
-      yAxis.ticks.forEach(tick => {
-        const lbl = fmtK(tick.value);
-        const w = ctx.measureText(lbl).width + PILL_PAD * 2;
-        if (w > maxW) maxW = w;
-      });
-      const pillX = yAxis.left - 6; // bordo destro delle pill = bordo sinistro asse
-      yAxis.ticks.forEach((tick, i) => {
-        const lbl = fmtK(tick.value);
-        const y = yAxis.getPixelForTick(i);
-        // pill a larghezza fissa (maxW) per allineamento colonna
-        ctx.beginPath();
-        ctx.roundRect(pillX - maxW, y - PILL_H/2, maxW, PILL_H, R);
-        ctx.fillStyle = 'rgba(226,184,74,0.09)';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(226,184,74,0.28)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        ctx.fillStyle = 'rgba(226,184,74,0.9)';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(lbl, pillX - maxW/2, y);
       });
       ctx.restore();
     }
@@ -3169,15 +3136,12 @@ function _buildMonthlyChart(filteredRows, allRows_, filteredAll) {
         },
         y: {
           ticks: {
-            color: 'transparent',
-            font: { size: 10 },
-            callback: v => fmtK(v)
+            color: 'rgba(226,184,74,0.85)',
+            font: { size: 10, weight: '700', family: 'DM Sans, sans-serif' },
+            callback: v => fmtK(v),
+            padding: 6
           },
-          grid: { color: 'rgba(255,255,255,0.05)' },
-          afterFit(scale) {
-            // Forza spazio sufficiente per le pill Y (largh. max ~70px)
-            scale.width = Math.max(scale.width, 72);
-          }
+          grid: { color: 'rgba(255,255,255,0.05)' }
         }
       }
     },
@@ -3526,7 +3490,7 @@ function renderSettings() {
                   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                   background-clip:text">PRO</span>
               </div>
-              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.23 - 13:12</div>
+              <div id="settings-version" style="font-size:11px;color:var(--text-muted);margin-top:3px">Versione 2.0 · build 2026.02.23 - 13:18</div>
             </div>
           </div>
           <div style="width:100%;height:1px;background:rgba(255,255,255,0.06)"></div>
@@ -4258,7 +4222,7 @@ window._importMode = _importMode;
 window._colMap = _colMap;
 window._commercialeImport = _commercialeImport;
 
-const APP_VERSION = '20260223-131205';
+const APP_VERSION = '20260223-131822';
 
 loadFromIDB(); // carica da localStorage e mostra i dati
 renderSavePathSection();
